@@ -12,6 +12,7 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
@@ -42,6 +43,7 @@ public class DisasterManager implements MiniGame {
     private final Map<UUID, GameMode> previousModes = new HashMap<>();
     private final Map<UUID, Long> lastDash = new HashMap<>();
     private final Set<UUID> meteorEntities = new HashSet<>();
+    private final Set<FallingBlock> tornadoDebris = new HashSet<>();
 
     private boolean running = false;
     private BukkitTask tickTask;
@@ -106,6 +108,8 @@ public class DisasterManager implements MiniGame {
         activePlayers.remove(uuid);
         spectators.remove(uuid);
         clearDashItems(player);
+        player.setFlying(false);
+        player.setAllowFlight(false);
         scoreboard.detach(player);
         restoreGameMode(player);
         plugin.getSessionManager().clear(uuid);
@@ -182,6 +186,9 @@ public class DisasterManager implements MiniGame {
                 p.setGameMode(GameMode.SURVIVAL);
                 p.setHealth(maxHealth(p));
                 p.setFoodLevel(20);
+                // Evite le kick "Flying is not enabled" quand la tornade soulève le joueur.
+                p.setAllowFlight(true);
+                p.setFlying(false);
                 if (dashEnabled) {
                     p.getInventory().addItem(createDashItem());
                 }
@@ -290,6 +297,7 @@ public class DisasterManager implements MiniGame {
 
     private void endCurrentWave() {
         clearMeteors();
+        clearTornadoDebris();
         phase = Phase.INTERMISSION;
         secondsLeft = Math.max(1, plugin.getConfig().getInt("disaster.intermission-seconds", 5));
         broadcast("§a[Disaster] §fAccalmie... la prochaine vague sera pire.");
@@ -309,12 +317,12 @@ public class DisasterManager implements MiniGame {
             world.spawnParticle(Particle.LARGE_SMOKE, tnt.getLocation(), 3, 0.1, 0.1, 0.1, 0.0);
         }
 
-        int baseInterval = Math.max(1, plugin.getConfig().getInt("disaster.meteor.interval-ticks", 12));
-        int interval = Math.max(4, baseInterval - (intensity - 1) * 2);
+        int baseInterval = Math.max(1, plugin.getConfig().getInt("disaster.meteor.interval-ticks", 8));
+        int interval = Math.max(2, baseInterval - (intensity - 1) * 2);
         if (tickCounter % interval != 0) return;
 
-        int baseCount = Math.max(1, plugin.getConfig().getInt("disaster.meteor.count-per-wave", 2));
-        int count = Math.min(baseCount + (intensity - 1), baseCount + 12);
+        int baseCount = Math.max(1, plugin.getConfig().getInt("disaster.meteor.count-per-wave", 4));
+        int count = Math.min(baseCount + (intensity - 1) * 2, baseCount + 24);
         float power = (float) plugin.getConfig().getDouble("disaster.meteor.power", 4.0);
 
         int fuse = Math.max(60, plugin.getConfig().getInt("disaster.meteor.fuse-ticks", 100));
@@ -380,6 +388,59 @@ public class DisasterManager implements MiniGame {
         meteorEntities.clear();
     }
 
+    /** La tornade aspire des blocs du sol (visuel, sans casser la map) et les fait tournoyer avec elle. */
+    private void updateTornadoDebris(World world, Zone arena) {
+        // Faire tourbillonner les débris existants, retirer les trop vieux.
+        Iterator<FallingBlock> it = tornadoDebris.iterator();
+        while (it.hasNext()) {
+            FallingBlock fb = it.next();
+            if (fb == null || fb.isDead() || !fb.isValid() || fb.getTicksLived() > 45) {
+                if (fb != null) fb.remove();
+                it.remove();
+                continue;
+            }
+            double dx = tornadoCenter.getX() - fb.getLocation().getX();
+            double dz = tornadoCenter.getZ() - fb.getLocation().getZ();
+            Vector toCenter = new Vector(dx, 0, dz);
+            if (toCenter.lengthSquared() > 0) toCenter.normalize();
+            Vector swirl = new Vector(-toCenter.getZ(), 0, toCenter.getX());
+            Vector vel = toCenter.multiply(0.25).add(swirl.multiply(0.5));
+            vel.setY(0.28);
+            fb.setVelocity(vel);
+        }
+
+        // En aspirer de nouveaux régulièrement, façon terre arrachée au sol.
+        int max = 24;
+        if (tornadoDebris.size() < max && tickCounter % 6 == 0) {
+            Material ground = world.getBlockAt(tornadoCenter.getBlockX(),
+                    (int) Math.floor(arena.getMinY()), tornadoCenter.getBlockZ()).getType();
+            if (ground.isAir() || !ground.isSolid()) {
+                ground = Material.DIRT;
+            }
+            for (int k = 0; k < 3; k++) {
+                double ang = random.nextDouble() * Math.PI * 2;
+                double r = random.nextDouble() * 2.0;
+                double x = tornadoCenter.getX() + Math.cos(ang) * r;
+                double z = tornadoCenter.getZ() + Math.sin(ang) * r;
+                Location loc = new Location(world, x, arena.getMinY() + 0.5, z);
+                FallingBlock fb = world.spawnFallingBlock(loc, ground.createBlockData());
+                fb.setDropItem(false);
+                fb.setHurtEntities(false);
+                fb.setCancelDrop(true);
+                fb.setPersistent(false);
+                fb.setVelocity(new Vector(0, 0.6, 0));
+                tornadoDebris.add(fb);
+            }
+        }
+    }
+
+    private void clearTornadoDebris() {
+        for (FallingBlock fb : tornadoDebris) {
+            if (fb != null && !fb.isDead()) fb.remove();
+        }
+        tornadoDebris.clear();
+    }
+
     private void tornadoTick() {
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());
@@ -421,9 +482,11 @@ public class DisasterManager implements MiniGame {
             world.playSound(tornadoCenter, Sound.ENTITY_PHANTOM_FLAP, 1.4f, 0.4f);
         }
 
+        updateTornadoDebris(world, arena);
+
         if (tickCounter % 3 != 0) return;
 
-        double radius = plugin.getConfig().getDouble("disaster.tornado.radius", 6.0);
+        double radius = plugin.getConfig().getDouble("disaster.tornado.radius", 7.0) + (intensity - 1);
         double pull = plugin.getConfig().getDouble("disaster.tornado.pull-strength", 0.6);
         double lift = plugin.getConfig().getDouble("disaster.tornado.lift-strength", 0.55);
         double dmgPerSecond = plugin.getConfig().getDouble("disaster.tornado.damage-per-second", 2.0);
@@ -457,12 +520,12 @@ public class DisasterManager implements MiniGame {
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());
         if (world == null) return;
 
-        int baseInterval = Math.max(10, plugin.getConfig().getInt("disaster.lightning.interval-ticks", 40));
-        int interval = Math.max(10, baseInterval - (intensity - 1) * 3);
+        int baseInterval = Math.max(10, plugin.getConfig().getInt("disaster.lightning.interval-ticks", 30));
+        int interval = Math.max(8, baseInterval - (intensity - 1) * 3);
         if (tickCounter % interval != 0) return;
 
-        int baseStrikes = Math.max(1, plugin.getConfig().getInt("disaster.lightning.strikes-per-wave", 1));
-        int strikes = Math.min(baseStrikes + (intensity - 1), baseStrikes + 8);
+        int baseStrikes = Math.max(1, plugin.getConfig().getInt("disaster.lightning.strikes-per-wave", 2));
+        int strikes = Math.min(baseStrikes + (intensity - 1), baseStrikes + 10);
         boolean targetPlayers = plugin.getConfig().getBoolean("disaster.lightning.target-players", false);
 
         for (int i = 0; i < strikes; i++) {
@@ -510,7 +573,7 @@ public class DisasterManager implements MiniGame {
         if (!activePlayers.contains(uuid)) return;
         if (!plugin.getConfig().getBoolean("disaster.dash.enabled", true)) return;
 
-        long cooldownMs = Math.max(0, plugin.getConfig().getInt("disaster.dash.cooldown-seconds", 3)) * 1000L;
+        long cooldownMs = Math.max(0, plugin.getConfig().getInt("disaster.dash.cooldown-seconds", 6)) * 1000L;
         long now = System.currentTimeMillis();
         Long last = lastDash.get(uuid);
         if (last != null && now - last < cooldownMs) {
@@ -566,6 +629,8 @@ public class DisasterManager implements MiniGame {
             clearDashItems(p);
             p.setFireTicks(0);
             p.setHealth(maxHealth(p));
+            p.setFlying(false);
+            p.setAllowFlight(false);
             sendToSpectator(p);
             p.sendMessage("§c[Disaster] §fTu es éliminé ! Direction la zone des spectateurs.");
         }
@@ -640,6 +705,7 @@ public class DisasterManager implements MiniGame {
     private void cleanupAndReset() {
         cancelTasks();
         clearMeteors();
+        clearTornadoDebris();
 
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());
@@ -655,6 +721,8 @@ public class DisasterManager implements MiniGame {
             if (p != null) {
                 clearDashItems(p);
                 p.setFireTicks(0);
+                p.setFlying(false);
+                p.setAllowFlight(false);
                 scoreboard.detach(p);
                 restoreGameMode(p);
                 sendToHub(p);
@@ -680,23 +748,24 @@ public class DisasterManager implements MiniGame {
         }
 
         if (world != null) {
+            int blocksPerTick = Math.max(500, plugin.getConfig().getInt("disaster.regen-blocks-per-tick", 20000));
             boolean regenerated = false;
             File baseline = baselineFile();
             if (baseline.exists()) {
                 try {
                     ZoneSnapshot base = ZoneSnapshot.loadFromFile(baseline);
                     if (base != null) {
-                        base.restore(world);
+                        base.restoreProgressive(plugin, world, blocksPerTick);
                         regenerated = true;
-                        plugin.getLogger().info("[Disaster] Zone régénérée depuis la sauvegarde.");
+                        plugin.getLogger().info("[Disaster] Régénération progressive depuis la sauvegarde...");
                     }
                 } catch (Exception e) {
                     plugin.getLogger().warning("[Disaster] Sauvegarde illisible : " + e.getMessage());
                 }
             }
             if (!regenerated && snapshot != null) {
-                snapshot.restore(world);
-                plugin.getLogger().info("[Disaster] Zone régénérée (instantané de lancement).");
+                snapshot.restoreProgressive(plugin, world, blocksPerTick);
+                plugin.getLogger().info("[Disaster] Régénération progressive (instantané de lancement)...");
             }
         }
         snapshot = null;

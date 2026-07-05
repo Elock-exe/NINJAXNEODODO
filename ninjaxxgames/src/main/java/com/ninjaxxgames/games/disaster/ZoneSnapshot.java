@@ -91,6 +91,41 @@ public final class ZoneSnapshot {
         }
     }
 
+    /**
+     * Régénère la zone progressivement, {@code blocksPerTick} blocs par tick, pour éviter le gel
+     * du serveur lors de la restauration de très grandes arènes.
+     */
+    public void restoreProgressive(org.bukkit.plugin.Plugin plugin, World world, int blocksPerTick) {
+        if (world == null) return;
+        final long total = (long) sizeX * sizeY * sizeZ;
+        final int perTick = Math.max(1, blocksPerTick);
+        new org.bukkit.scheduler.BukkitRunnable() {
+            long idx = 0;
+
+            @Override
+            public void run() {
+                int done = 0;
+                while (idx < total && done < perTick) {
+                    int i = (int) idx;
+                    int dx = i / (sizeY * sizeZ);
+                    int rem = i % (sizeY * sizeZ);
+                    int dy = rem / sizeZ;
+                    int dz = rem % sizeZ;
+                    BlockData want = data[i];
+                    Block block = world.getBlockAt(x0 + dx, y0 + dy, z0 + dz);
+                    if (!block.getBlockData().equals(want)) {
+                        block.setBlockData(want, false);
+                    }
+                    idx++;
+                    done++;
+                }
+                if (idx >= total) {
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
     public void saveToFile(File file) throws IOException {
         File parent = file.getParentFile();
         if (parent != null) parent.mkdirs();

@@ -32,6 +32,7 @@ public class PropHuntManager implements MiniGame {
 
     public static final String ID = "prophunt";
     private static final String TOOL_NAME = "§a§lCAMOUFLAGE §7(clic droit sur un bloc)";
+    private static final String SEEKER_SWORD_NAME = "§c🗡 Traqueur";
     private static final String SB_TITLE = "§b§l🔍 PROP HUNT";
     private static final int SYNC_TICKS = 60; // 3 secondes immobile avant synchronisation
 
@@ -66,6 +67,7 @@ public class PropHuntManager implements MiniGame {
     private final Map<UUID, Integer> immobileTicks = new HashMap<>();
     private final Set<UUID> synchronizedHiders = new HashSet<>();
     private final Map<UUID, Integer> survivalEarned = new HashMap<>();
+    private final Map<UUID, Integer> hiderHealth = new HashMap<>();
 
     private Phase phase = Phase.IDLE;
     private BossBar bossBar;
@@ -80,6 +82,7 @@ public class PropHuntManager implements MiniGame {
     private int totalHidersInitial;
     private int findValue;
     private int pointsPerSecond;
+    private int hiderMaxHits;
 
     public PropHuntManager(NinjaxxGames plugin) {
         this.plugin = plugin;
@@ -138,7 +141,9 @@ public class PropHuntManager implements MiniGame {
         hiders.remove(uuid);
         clearDisguise(player);
         removeGameEffects(player);
+        removeSeekerWeapon(player);
         foundCount.remove(uuid);
+        hiderHealth.remove(uuid);
         scoreboard.detach(player);
         if (bossBar != null) bossBar.removePlayer(player);
         plugin.getSessionManager().clear(uuid);
@@ -173,6 +178,7 @@ public class PropHuntManager implements MiniGame {
         immobileTicks.clear();
         synchronizedHiders.clear();
         survivalEarned.clear();
+        hiderHealth.clear();
 
         int total = activePlayers.size();
         int perSeeker = Math.max(1, plugin.getConfig().getInt("prophunt.seekers-per-player", 10));
@@ -190,6 +196,7 @@ public class PropHuntManager implements MiniGame {
         int winBonus = plugin.getConfig().getInt("prophunt.points.win-bonus", 100);
         findValue = Math.max(1, (int) Math.round(winBonus / (double) totalHidersInitial));
         pointsPerSecond = Math.max(0, plugin.getConfig().getInt("prophunt.points.per-second", 2));
+        hiderMaxHits = Math.max(1, plugin.getConfig().getInt("prophunt.hider-hits", 3));
 
         int participation = plugin.getConfig().getInt("prophunt.points.participation", 10);
         for (UUID uuid : activePlayers) {
@@ -208,18 +215,21 @@ public class PropHuntManager implements MiniGame {
         }
 
         for (UUID uuid : hiders) {
+            hiderHealth.put(uuid, hiderMaxHits);
             Player p = plugin.getServer().getPlayer(uuid);
             if (p == null) continue;
             p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
             p.getInventory().addItem(createDisguiseTool());
             giveTauntItems(p);
             p.sendMessage("§a[Prop Hunt] §fTu es §aCACHÉ§f ! Clic droit sur un bloc pour te déguiser.");
+            p.sendMessage("§7[Prop Hunt] Tu encaisses §e" + hiderMaxHits + " §7coup(s) avant d'être démasqué.");
             p.sendMessage("§7[Prop Hunt] Les objets §ejaunes §7jouent des §ebruits §7pour piéger les chercheurs (clic droit).");
         }
         for (UUID uuid : seekers) {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p == null) continue;
             freezeSeeker(p);
+            giveSeekerWeapon(p);
             p.sendMessage("§c[Prop Hunt] §fTu es §cCHERCHEUR§f ! Tu es aveuglé pendant la phase de camouflage...");
         }
 
@@ -378,17 +388,31 @@ public class PropHuntManager implements MiniGame {
         if (!seekers.contains(attackerId)) return;
         if (!hiders.contains(victimId)) return;
 
-        found(victimId, attackerId);
+        int remaining = hiderHealth.getOrDefault(victimId, 1) - 1;
+        if (remaining <= 0) {
+            hiderHealth.remove(victimId);
+            found(victimId, attackerId);
+            return;
+        }
+
+        // Le caché encaisse le coup mais n'est pas encore démasqué : il faut d'autres coups.
+        hiderHealth.put(victimId, remaining);
+        victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
+        attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.2f);
+        attacker.sendMessage("§e[Prop Hunt] §fTouché ! Encore §c" + remaining + " §fcoup(s) pour le démasquer.");
+        victim.sendMessage("§c[Prop Hunt] §fAïe ! Il te reste §e" + remaining + " §fPV — fuis !");
     }
 
     private void found(UUID hiderId, UUID seekerId) {
         hiders.remove(hiderId);
+        hiderHealth.remove(hiderId);
 
         Player hider = plugin.getServer().getPlayer(hiderId);
         if (hider != null) {
             clearDisguise(hider);
             removeGameEffects(hider);
             removeTauntItems(hider);
+            giveSeekerWeapon(hider);
 
             int earned = survivalEarned.getOrDefault(hiderId, 0);
             hider.sendMessage("§c[Prop Hunt] §fTrouvé ! Tu as survécu §e" + seekElapsed + "s §f→ §a+" + earned + " pts §fau total. Tu deviens chercheur.");
@@ -457,6 +481,7 @@ public class PropHuntManager implements MiniGame {
                 removeGameEffects(p);
                 removeToolItems(p);
                 removeTauntItems(p);
+                removeSeekerWeapon(p);
                 scoreboard.detach(p);
                 sendToHub(p);
             }
@@ -483,6 +508,7 @@ public class PropHuntManager implements MiniGame {
         immobileTicks.clear();
         synchronizedHiders.clear();
         survivalEarned.clear();
+        hiderHealth.clear();
         phase = Phase.IDLE;
     }
 
@@ -583,6 +609,9 @@ public class PropHuntManager implements MiniGame {
                 int ticks = immobileTicks.merge(uuid, 1, Integer::sum);
                 if (ticks >= SYNC_TICKS) {
                     synchronize(p, display);
+                } else {
+                    int remaining = (int) Math.ceil((SYNC_TICKS - ticks) / 20.0);
+                    actionBar(p, "§eSynchronisation dans §f§l" + remaining + "s§r §e...");
                 }
             }
             lastLoc.put(uuid, current);
@@ -602,13 +631,19 @@ public class PropHuntManager implements MiniGame {
 
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_STONE_PLACE, 1.0f, 1.4f);
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 2.0f);
-        player.sendMessage("§a[Prop Hunt] §f✔ Camouflage §asynchronisé§f — tu es fondu dans le décor. Ne bouge plus !");
+        actionBar(player, "§a§l✔ Camouflage synchronisé §r§7— fondu dans le décor, ne bouge plus !");
         updateScoreboards();
     }
 
     private Location snappedBlockLocation(Location loc) {
         return new Location(loc.getWorld(),
                 Math.floor(loc.getX()), Math.floor(loc.getY()), Math.floor(loc.getZ()));
+    }
+
+    /** Envoie un message dans l'action bar en interprétant les codes couleur legacy (§). */
+    private void actionBar(Player player, String legacy) {
+        player.sendActionBar(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                .legacySection().deserialize(legacy));
     }
 
     private Location centeredLocation(Location loc) {
@@ -693,6 +728,50 @@ public class PropHuntManager implements MiniGame {
             if (item != null) {
                 ItemMeta meta = item.getItemMeta();
                 if (meta != null && meta.hasDisplayName() && isTauntName(meta.getDisplayName())) {
+                    p.getInventory().setItem(i, null);
+                }
+            }
+        }
+    }
+
+    private ItemStack createSeekerSword() {
+        ItemStack item = new ItemStack(Material.STONE_SWORD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(SEEKER_SWORD_NAME);
+            meta.setLore(List.of(
+                    "§7Frappe les blocs suspects",
+                    "§7pour démasquer les cachés !"
+            ));
+            meta.setEnchantmentGlintOverride(true);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void giveSeekerWeapon(Player p) {
+        if (!hasSeekerWeapon(p)) {
+            p.getInventory().addItem(createSeekerSword());
+        }
+    }
+
+    private boolean hasSeekerWeapon(Player p) {
+        for (ItemStack item : p.getInventory().getContents()) {
+            if (item != null) {
+                ItemMeta meta = item.getItemMeta();
+                if (meta != null && SEEKER_SWORD_NAME.equals(meta.getDisplayName())) return true;
+            }
+        }
+        return false;
+    }
+
+    private void removeSeekerWeapon(Player p) {
+        ItemStack[] contents = p.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item != null) {
+                ItemMeta meta = item.getItemMeta();
+                if (meta != null && SEEKER_SWORD_NAME.equals(meta.getDisplayName())) {
                     p.getInventory().setItem(i, null);
                 }
             }

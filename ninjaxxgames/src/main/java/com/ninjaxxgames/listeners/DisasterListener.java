@@ -12,6 +12,7 @@ import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
 public class DisasterListener implements Listener {
@@ -37,6 +38,15 @@ public class DisasterListener implements Listener {
 
         event.setCancelled(true);
         manager.handleDash(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onToggleFlight(PlayerToggleFlightEvent event) {
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
+        // On garde allowFlight (évite le kick "Flying is not enabled"), mais on empêche le vol réel.
+        event.setCancelled(true);
+        event.getPlayer().setFlying(false);
     }
 
     @EventHandler
