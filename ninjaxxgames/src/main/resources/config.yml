@@ -92,6 +92,8 @@ disaster:
     lift-strength: 0.55
     damage-per-second: 2.0
     move-speed: 0.35
+    # Nombre max de tornades simultanées (elles apparaissent avec la montée d'intensité, en fin de partie)
+    max-count: 4
   lightning:
     interval-ticks: 30
     strikes-per-wave: 2

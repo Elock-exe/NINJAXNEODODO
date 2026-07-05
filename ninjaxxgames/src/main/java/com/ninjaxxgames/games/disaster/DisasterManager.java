@@ -58,8 +58,13 @@ public class DisasterManager implements MiniGame {
     private int intensity = 1;
     private int secondsLeft;
 
-    private Location tornadoCenter;
-    private Location tornadoTarget;
+    private final List<Vortex> vortices = new ArrayList<>();
+
+    private static final class Vortex {
+        Location center;
+        Location target;
+        Vortex(Location center) { this.center = center; }
+    }
 
     public DisasterManager(NinjaxxGames plugin) {
         this.plugin = plugin;
@@ -282,8 +287,7 @@ public class DisasterManager implements MiniGame {
 
         phase = Phase.DISASTER;
         secondsLeft = Math.max(5, plugin.getConfig().getInt("disaster.round-duration-seconds", 45));
-        tornadoCenter = null;
-        tornadoTarget = null;
+        vortices.clear();
 
         broadcast("§8§m                                        ");
         broadcast("§6§lVAGUE " + waveNumber + " §7— " + describeActive());
@@ -388,9 +392,11 @@ public class DisasterManager implements MiniGame {
         meteorEntities.clear();
     }
 
-    /** La tornade aspire des blocs du sol (visuel, sans casser la map) et les fait tournoyer avec elle. */
+    /** Les tornades aspirent des blocs du sol (visuel, sans casser la map) et les font tournoyer avec elles. */
     private void updateTornadoDebris(World world, Zone arena) {
-        // Faire tourbillonner les débris existants, retirer les trop vieux.
+        if (vortices.isEmpty()) return;
+
+        // Faire tourbillonner les débris existants autour de la tornade la plus proche.
         Iterator<FallingBlock> it = tornadoDebris.iterator();
         while (it.hasNext()) {
             FallingBlock fb = it.next();
@@ -399,8 +405,10 @@ public class DisasterManager implements MiniGame {
                 it.remove();
                 continue;
             }
-            double dx = tornadoCenter.getX() - fb.getLocation().getX();
-            double dz = tornadoCenter.getZ() - fb.getLocation().getZ();
+            Vortex v = nearestVortex(fb.getLocation());
+            if (v == null) continue;
+            double dx = v.center.getX() - fb.getLocation().getX();
+            double dz = v.center.getZ() - fb.getLocation().getZ();
             Vector toCenter = new Vector(dx, 0, dz);
             if (toCenter.lengthSquared() > 0) toCenter.normalize();
             Vector swirl = new Vector(-toCenter.getZ(), 0, toCenter.getX());
@@ -409,27 +417,29 @@ public class DisasterManager implements MiniGame {
             fb.setVelocity(vel);
         }
 
-        // En aspirer de nouveaux régulièrement, façon terre arrachée au sol.
-        int max = 24;
-        if (tornadoDebris.size() < max && tickCounter % 6 == 0) {
-            Material ground = world.getBlockAt(tornadoCenter.getBlockX(),
-                    (int) Math.floor(arena.getMinY()), tornadoCenter.getBlockZ()).getType();
-            if (ground.isAir() || !ground.isSolid()) {
-                ground = Material.DIRT;
-            }
-            for (int k = 0; k < 3; k++) {
-                double ang = random.nextDouble() * Math.PI * 2;
-                double r = random.nextDouble() * 2.0;
-                double x = tornadoCenter.getX() + Math.cos(ang) * r;
-                double z = tornadoCenter.getZ() + Math.sin(ang) * r;
-                Location loc = new Location(world, x, arena.getMinY() + 0.5, z);
-                FallingBlock fb = world.spawnFallingBlock(loc, ground.createBlockData());
-                fb.setDropItem(false);
-                fb.setHurtEntities(false);
-                fb.setCancelDrop(true);
-                fb.setPersistent(false);
-                fb.setVelocity(new Vector(0, 0.6, 0));
-                tornadoDebris.add(fb);
+        // En aspirer de nouveaux autour de chaque tornade, façon terre arrachée au sol.
+        int maxTotal = 12 * vortices.size();
+        if (tornadoDebris.size() < maxTotal && tickCounter % 6 == 0) {
+            for (Vortex v : vortices) {
+                Material ground = world.getBlockAt(v.center.getBlockX(),
+                        (int) Math.floor(arena.getMinY()), v.center.getBlockZ()).getType();
+                if (ground.isAir() || !ground.isSolid()) {
+                    ground = Material.DIRT;
+                }
+                for (int k = 0; k < 2; k++) {
+                    double ang = random.nextDouble() * Math.PI * 2;
+                    double r = random.nextDouble() * 2.0;
+                    double x = v.center.getX() + Math.cos(ang) * r;
+                    double z = v.center.getZ() + Math.sin(ang) * r;
+                    Location loc = new Location(world, x, arena.getMinY() + 0.5, z);
+                    FallingBlock fb = world.spawnFallingBlock(loc, ground.createBlockData());
+                    fb.setDropItem(false);
+                    fb.setHurtEntities(false);
+                    fb.setCancelDrop(true);
+                    fb.setPersistent(false);
+                    fb.setVelocity(new Vector(0, 0.6, 0));
+                    tornadoDebris.add(fb);
+                }
             }
         }
     }
@@ -448,38 +458,45 @@ public class DisasterManager implements MiniGame {
 
         double speed = plugin.getConfig().getDouble("disaster.tornado.move-speed", 0.35);
 
-        if (tornadoCenter == null) {
-            tornadoCenter = randomArenaPoint(arena, world);
+        // Nombre de tornades = intensité (fin de partie = plusieurs), plafonné par la config.
+        int maxCount = Math.max(1, plugin.getConfig().getInt("disaster.tornado.max-count", 4));
+        int desiredCount = Math.min(Math.max(1, intensity), maxCount);
+        while (vortices.size() < desiredCount) {
+            vortices.add(new Vortex(randomArenaPoint(arena, world)));
         }
-        if (tornadoTarget == null || horizontalDistance(tornadoCenter, tornadoTarget) < 1.5) {
-            tornadoTarget = randomArenaPoint(arena, world);
-        }
-        double mdx = tornadoTarget.getX() - tornadoCenter.getX();
-        double mdz = tornadoTarget.getZ() - tornadoCenter.getZ();
-        double md = Math.sqrt(mdx * mdx + mdz * mdz);
-        if (md > 0.001) {
-            tornadoCenter.add((mdx / md) * speed, 0, (mdz / md) * speed);
-        }
-        tornadoCenter.setX(clamp(tornadoCenter.getX(), arena.getMinX(), arena.getMaxX()));
-        tornadoCenter.setZ(clamp(tornadoCenter.getZ(), arena.getMinZ(), arena.getMaxZ()));
 
         double height = Math.max(7.0, arena.getMaxY() - arena.getMinY() + 4);
         double baseY = arena.getMinY();
-        for (double h = 0; h < height; h += 0.5) {
-            double r = 0.8 + h * 0.18;
-            for (int k = 0; k < 3; k++) {
-                double ang = tickCounter * 0.5 + h * 0.8 + (Math.PI * 2.0 / 3.0) * k;
-                double px = tornadoCenter.getX() + Math.cos(ang) * r;
-                double pz = tornadoCenter.getZ() + Math.sin(ang) * r;
-                Location pLoc = new Location(world, px, baseY + h, pz);
-                world.spawnParticle(Particle.CLOUD, pLoc, 1, 0.02, 0.02, 0.02, 0.0);
-                if (((int) (h * 2)) % 3 == 0) {
-                    world.spawnParticle(Particle.LARGE_SMOKE, pLoc, 1, 0.0, 0.0, 0.0, 0.0);
+
+        for (Vortex v : vortices) {
+            if (v.target == null || horizontalDistance(v.center, v.target) < 1.5) {
+                v.target = randomArenaPoint(arena, world);
+            }
+            double mdx = v.target.getX() - v.center.getX();
+            double mdz = v.target.getZ() - v.center.getZ();
+            double md = Math.sqrt(mdx * mdx + mdz * mdz);
+            if (md > 0.001) {
+                v.center.add((mdx / md) * speed, 0, (mdz / md) * speed);
+            }
+            v.center.setX(clamp(v.center.getX(), arena.getMinX(), arena.getMaxX()));
+            v.center.setZ(clamp(v.center.getZ(), arena.getMinZ(), arena.getMaxZ()));
+
+            for (double h = 0; h < height; h += 0.5) {
+                double r = 0.8 + h * 0.18;
+                for (int k = 0; k < 3; k++) {
+                    double ang = tickCounter * 0.5 + h * 0.8 + (Math.PI * 2.0 / 3.0) * k;
+                    double px = v.center.getX() + Math.cos(ang) * r;
+                    double pz = v.center.getZ() + Math.sin(ang) * r;
+                    Location pLoc = new Location(world, px, baseY + h, pz);
+                    world.spawnParticle(Particle.CLOUD, pLoc, 1, 0.02, 0.02, 0.02, 0.0);
+                    if (((int) (h * 2)) % 3 == 0) {
+                        world.spawnParticle(Particle.LARGE_SMOKE, pLoc, 1, 0.0, 0.0, 0.0, 0.0);
+                    }
                 }
             }
-        }
-        if (tickCounter % 20 == 0) {
-            world.playSound(tornadoCenter, Sound.ENTITY_PHANTOM_FLAP, 1.4f, 0.4f);
+            if (tickCounter % 20 == 0) {
+                world.playSound(v.center, Sound.ENTITY_PHANTOM_FLAP, 1.4f, 0.4f);
+            }
         }
 
         updateTornadoDebris(world, arena);
@@ -495,8 +512,10 @@ public class DisasterManager implements MiniGame {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p == null) continue;
             Location pl = p.getLocation();
-            double dx = tornadoCenter.getX() - pl.getX();
-            double dz = tornadoCenter.getZ() - pl.getZ();
+            Vortex near = nearestVortex(pl);
+            if (near == null) continue;
+            double dx = near.center.getX() - pl.getX();
+            double dz = near.center.getZ() - pl.getZ();
             double dist = Math.sqrt(dx * dx + dz * dz);
             if (dist > radius) continue;
 
@@ -513,6 +532,21 @@ public class DisasterManager implements MiniGame {
 
             p.damage(dmgPerSecond * 3.0 / 20.0);
         }
+    }
+
+    private Vortex nearestVortex(Location loc) {
+        Vortex best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (Vortex v : vortices) {
+            double dx = v.center.getX() - loc.getX();
+            double dz = v.center.getZ() - loc.getZ();
+            double sq = dx * dx + dz * dz;
+            if (sq < bestSq) {
+                bestSq = sq;
+                best = v;
+            }
+        }
+        return best;
     }
 
     private void lightningTick() {
@@ -786,8 +820,7 @@ public class DisasterManager implements MiniGame {
         activeDisasters.clear();
         waveNumber = 0;
         intensity = 1;
-        tornadoCenter = null;
-        tornadoTarget = null;
+        vortices.clear();
         phase = Phase.INTERMISSION;
     }
 
