@@ -1,0 +1,13 @@
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+*.iml
+
+# OS
+Thumbs.db
+.DS_Store
