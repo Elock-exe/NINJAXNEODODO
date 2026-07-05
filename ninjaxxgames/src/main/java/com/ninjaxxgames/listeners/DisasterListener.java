@@ -70,6 +70,13 @@ public class DisasterListener implements Listener {
         DisasterManager manager = manager();
         if (manager == null || !manager.isActive(player.getUniqueId())) return;
 
+        // Les météorites (TNT) font moins mal : on réduit les dégâts d'explosion.
+        if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
+            double factor = plugin.getConfig().getDouble("disaster.meteor.damage-multiplier", 0.35);
+            event.setDamage(event.getDamage() * factor);
+        }
+
         if (player.getHealth() - event.getFinalDamage() <= 0.0) {
             event.setCancelled(true);
             manager.handleFatalDamage(player);

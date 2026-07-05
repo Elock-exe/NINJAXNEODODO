@@ -9,6 +9,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -17,6 +19,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.util.*;
 
@@ -215,6 +218,11 @@ public class HotPotatoManager implements MiniGame {
         return min + random.nextInt(max - min + 1);
     }
 
+    /** Un participant actif ne doit jamais perdre de vie : le listener annule les dégâts. */
+    public boolean isActiveParticipant(Player player) {
+        return running && activePlayers.contains(player.getUniqueId());
+    }
+
     public void handleHit(Player attacker, Player victim) {
         if (!running) return;
         UUID attackerId = attacker.getUniqueId();
@@ -227,9 +235,30 @@ public class HotPotatoManager implements MiniGame {
         clearPotato(attacker);
         addPotato(victimId, remaining);
 
+        applyWindBurst(attacker, victim);
+
         victim.sendMessage("§c🥔 [Patate] §e" + attacker.getName() + " §ft'a refilé la patate ! §7Vite, débarrasse-t'en !");
         attacker.sendMessage("§a[Patate] §fOuf, tu t'es débarrassé de la patate sur §e" + victim.getName() + " §f!");
         updateScoreboards();
+    }
+
+    /** Effet "wind burst" : envoie la victime valser (sans dégâts, les dégâts sont annulés par le listener). */
+    private void applyWindBurst(Player from, Player victim) {
+        Vector push = victim.getLocation().toVector().subtract(from.getLocation().toVector());
+        push.setY(0);
+        if (push.lengthSquared() < 1.0E-4) {
+            push = victim.getLocation().getDirection().setY(0);
+        }
+        if (push.lengthSquared() > 1.0E-4) {
+            push.normalize();
+        }
+        double strength = plugin.getConfig().getDouble("hotpotato.windburst-strength", 0.9);
+        double lift = plugin.getConfig().getDouble("hotpotato.windburst-lift", 0.55);
+        push.multiply(strength).setY(lift);
+        victim.setVelocity(push);
+
+        victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.2f, 1.0f);
+        victim.getWorld().spawnParticle(Particle.GUST, victim.getLocation().add(0, 1, 0), 1);
     }
 
     private void eliminate(UUID uuid) {

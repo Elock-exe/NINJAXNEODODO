@@ -19,6 +19,12 @@ public class PlayerMoveListener implements Listener {
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         if (event.getTo() == null) return;
+
+        // Joueurs gelés par /ninjaxx lineplayers : position verrouillée, on n'exécute rien d'autre.
+        if (plugin.getFormationManager().handleMove(event)) {
+            return;
+        }
+
         if (event.getFrom().getX() == event.getTo().getX()
                 && event.getFrom().getY() == event.getTo().getY()
                 && event.getFrom().getZ() == event.getTo().getZ()) {

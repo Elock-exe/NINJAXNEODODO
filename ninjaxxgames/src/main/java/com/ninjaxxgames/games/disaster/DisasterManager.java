@@ -161,7 +161,7 @@ public class DisasterManager implements MiniGame {
         running = true;
 
         if (plugin.getConfig().getBoolean("disaster.regen-after-game", true)) {
-            long maxBlocks = plugin.getConfig().getLong("disaster.max-regen-blocks", 1_000_000L);
+            long maxBlocks = plugin.getConfig().getLong("disaster.max-regen-blocks", 2_000_000L);
             snapshot = ZoneSnapshot.capture(world, arena, maxBlocks);
             if (snapshot == null) {
                 plugin.getLogger().warning("[Disaster] Zone trop grande (> " + maxBlocks
@@ -924,7 +924,7 @@ public class DisasterManager implements MiniGame {
         if (arena == null) return "zone manquante : arena (/ninjaxx setdisasterzone)";
         World world = plugin.getServer().getWorld(arena.getWorld());
         if (world == null) return "monde de l'arène introuvable : " + arena.getWorld();
-        long maxBlocks = plugin.getConfig().getLong("disaster.max-regen-blocks", 1_000_000L);
+        long maxBlocks = plugin.getConfig().getLong("disaster.max-regen-blocks", 2_000_000L);
         ZoneSnapshot snap = ZoneSnapshot.capture(world, arena, maxBlocks);
         if (snap == null) return "arène trop grande (> " + maxBlocks + " blocs) ou invalide";
         try {

@@ -33,6 +33,7 @@ public class PropHuntManager implements MiniGame {
     public static final String ID = "prophunt";
     private static final String TOOL_NAME = "§a§lCAMOUFLAGE §7(clic droit sur un bloc)";
     private static final String SB_TITLE = "§b§l🔍 PROP HUNT";
+    private static final int SYNC_TICKS = 60; // 3 secondes immobile avant synchronisation
 
     private record Taunt(Material material, String name, Sound sound) {}
 
@@ -62,6 +63,9 @@ public class PropHuntManager implements MiniGame {
     private final Map<UUID, BlockDisplay> upperDisguises = new HashMap<>();
     private final Map<UUID, Location> lastLoc = new HashMap<>();
     private final Map<UUID, Integer> foundCount = new HashMap<>();
+    private final Map<UUID, Integer> immobileTicks = new HashMap<>();
+    private final Set<UUID> synchronizedHiders = new HashSet<>();
+    private final Map<UUID, Integer> survivalEarned = new HashMap<>();
 
     private Phase phase = Phase.IDLE;
     private BossBar bossBar;
@@ -75,6 +79,7 @@ public class PropHuntManager implements MiniGame {
     private int seekElapsed;
     private int totalHidersInitial;
     private int findValue;
+    private int pointsPerSecond;
 
     public PropHuntManager(NinjaxxGames plugin) {
         this.plugin = plugin;
@@ -165,6 +170,9 @@ public class PropHuntManager implements MiniGame {
         disguises.clear();
         lastLoc.clear();
         foundCount.clear();
+        immobileTicks.clear();
+        synchronizedHiders.clear();
+        survivalEarned.clear();
 
         int total = activePlayers.size();
         int perSeeker = Math.max(1, plugin.getConfig().getInt("prophunt.seekers-per-player", 10));
@@ -181,6 +189,7 @@ public class PropHuntManager implements MiniGame {
         totalHidersInitial = hiders.size();
         int winBonus = plugin.getConfig().getInt("prophunt.points.win-bonus", 100);
         findValue = Math.max(1, (int) Math.round(winBonus / (double) totalHidersInitial));
+        pointsPerSecond = Math.max(0, plugin.getConfig().getInt("prophunt.points.per-second", 2));
 
         int participation = plugin.getConfig().getInt("prophunt.points.participation", 10);
         for (UUID uuid : activePlayers) {
@@ -254,7 +263,6 @@ public class PropHuntManager implements MiniGame {
         String timeLine = phase == Phase.HIDING
                 ? "§7Camouflage §f" + hideRemaining + "s"
                 : "§7Temps §f" + formatTime(seekRemaining);
-        int survivalNow = survivalPoints();
 
         for (UUID uuid : activePlayers) {
             Player p = plugin.getServer().getPlayer(uuid);
@@ -273,14 +281,18 @@ public class PropHuntManager implements MiniGame {
                         "§7Tes points §f" + points
                 ));
             } else {
+                String syncLine = synchronizedHiders.contains(uuid)
+                        ? "§a✔ Synchronisé"
+                        : "§e… reste immobile 3s";
                 scoreboard.render(p, SB_TITLE, List.of(
                         "§7Rôle §a§lCACHÉ",
                         timeLine,
                         "§1",
                         "§7Survie §f" + seekElapsed + "s",
+                        syncLine,
                         "§7Cachés restants §e" + hiders.size(),
                         "§2",
-                        "§7Récompense §f+" + survivalNow + " §7(survie)",
+                        "§7Gagné §a+" + survivalEarned.getOrDefault(uuid, 0) + " §7(survie)",
                         "§7Tes points §f" + points
                 ));
             }
@@ -316,6 +328,12 @@ public class PropHuntManager implements MiniGame {
         } else if (phase == Phase.SEEKING) {
             seekElapsed++;
             seekRemaining--;
+            if (pointsPerSecond > 0) {
+                for (UUID uuid : hiders) {
+                    plugin.getScoreManager().addPoints(uuid, pointsPerSecond);
+                    survivalEarned.merge(uuid, pointsPerSecond, Integer::sum);
+                }
+            }
             if (bossBar != null) {
                 bossBar.setTitle("§cChasse §7— §f" + formatTime(seekRemaining) + " §7| §e" + hiders.size() + " §7caché(s)");
                 bossBar.setColor(BarColor.RED);
@@ -372,9 +390,8 @@ public class PropHuntManager implements MiniGame {
             removeGameEffects(hider);
             removeTauntItems(hider);
 
-            int survival = survivalPoints();
-            plugin.getScoreManager().addPoints(hiderId, survival);
-            hider.sendMessage("§c[Prop Hunt] §fTrouvé ! Tu as survécu §e" + seekElapsed + "s §f→ §a+" + survival + " pts§f. Tu deviens chercheur.");
+            int earned = survivalEarned.getOrDefault(hiderId, 0);
+            hider.sendMessage("§c[Prop Hunt] §fTrouvé ! Tu as survécu §e" + seekElapsed + "s §f→ §a+" + earned + " pts §fau total. Tu deviens chercheur.");
         }
 
         seekers.add(hiderId);
@@ -411,22 +428,21 @@ public class PropHuntManager implements MiniGame {
 
     private void endGameInternal(boolean awardSurvivors) {
         if (awardSurvivors) {
-            int survival = survivalPoints();
+            int survivorBonus = plugin.getConfig().getInt("prophunt.points.survivor-bonus", 25);
             for (UUID uuid : hiders) {
-                plugin.getScoreManager().addPoints(uuid, survival);
+                if (survivorBonus > 0) {
+                    plugin.getScoreManager().addPoints(uuid, survivorBonus);
+                    survivalEarned.merge(uuid, survivorBonus, Integer::sum);
+                }
+                int earned = survivalEarned.getOrDefault(uuid, 0);
                 Player p = plugin.getServer().getPlayer(uuid);
                 if (p != null) {
-                    p.sendMessage("§a[Prop Hunt] §fTu as survécu jusqu'au bout ! §a+" + survival + " pts");
+                    p.sendMessage("§a[Prop Hunt] §fTu as survécu jusqu'au bout ! §a+" + earned + " pts §7(dont +" + survivorBonus + " bonus)");
                 }
             }
             broadcast("§b§l🔍 PROP HUNT §f— fin de la partie ! §e" + hiders.size() + " §fcaché(s) ont survécu.");
         }
         cleanupAndReset();
-    }
-
-    private int survivalPoints() {
-        int winBonus = plugin.getConfig().getInt("prophunt.points.win-bonus", 100);
-        return (int) Math.round(winBonus * clamp01(seekElapsed / (double) seekDuration));
     }
 
     private void cleanupAndReset() {
@@ -464,6 +480,9 @@ public class PropHuntManager implements MiniGame {
         upperDisguises.clear();
         lastLoc.clear();
         foundCount.clear();
+        immobileTicks.clear();
+        synchronizedHiders.clear();
+        survivalEarned.clear();
         phase = Phase.IDLE;
     }
 
@@ -483,7 +502,12 @@ public class PropHuntManager implements MiniGame {
 
         BlockData lowerData = data;
         BlockData upperData = null;
-        if (data instanceof Bisected) {
+        // Seuls les vrais blocs de 2 de haut (portes, grandes plantes) se dédoublent.
+        // Les escaliers/trappes sont "Bisected" mais ne font qu'un bloc : on ne crée PAS de bloc au-dessus.
+        boolean twoTall = data instanceof Bisected
+                && !(data instanceof org.bukkit.block.data.type.Stairs)
+                && !(data instanceof org.bukkit.block.data.type.TrapDoor);
+        if (twoTall) {
             Bisected low = (Bisected) data.clone();
             low.setHalf(Bisected.Half.BOTTOM);
             lowerData = low;
@@ -508,7 +532,19 @@ public class PropHuntManager implements MiniGame {
         lastLoc.put(uuid, player.getLocation());
         player.setCollidable(true);
         removeToolItems(player);
+        hideHeldItem(player);
         player.sendMessage("§a[Prop Hunt] §fTu es déguisé en §e" + data.getMaterial().name().toLowerCase(Locale.ROOT) + "§f. Reste sous ton bloc pour te fondre dans le décor.");
+    }
+
+    /** Sélectionne un emplacement vide de la barre d'objets pour ne rien afficher dans la main du joueur déguisé. */
+    private void hideHeldItem(Player player) {
+        for (int slot = 0; slot < 9; slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || item.getType() == Material.AIR) {
+                player.getInventory().setHeldItemSlot(slot);
+                return;
+            }
+        }
     }
 
     private void removeDisguiseEntities(UUID uuid) {
@@ -526,14 +562,53 @@ public class PropHuntManager implements MiniGame {
             if (p == null || display == null || display.isDead()) continue;
 
             Location current = p.getLocation();
-            Location base = centeredLocation(current);
-            display.teleport(base);
-            BlockDisplay upper = upperDisguises.get(uuid);
-            if (upper != null && !upper.isDead()) {
-                upper.teleport(base.clone().add(0, 1, 0));
+            Location previous = lastLoc.get(uuid);
+            boolean moved = previous == null
+                    || previous.getWorld() != current.getWorld()
+                    || previous.distanceSquared(current) > 0.0025;
+
+            if (moved) {
+                immobileTicks.put(uuid, 0);
+                if (synchronizedHiders.remove(uuid)) {
+                    p.getWorld().playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.7f, 1.2f);
+                    updateScoreboards();
+                }
+                Location base = centeredLocation(current);
+                display.teleport(base);
+                BlockDisplay upper = upperDisguises.get(uuid);
+                if (upper != null && !upper.isDead()) {
+                    upper.teleport(base.clone().add(0, 1, 0));
+                }
+            } else if (!synchronizedHiders.contains(uuid)) {
+                int ticks = immobileTicks.merge(uuid, 1, Integer::sum);
+                if (ticks >= SYNC_TICKS) {
+                    synchronize(p, display);
+                }
             }
             lastLoc.put(uuid, current);
         }
+    }
+
+    private void synchronize(Player player, BlockDisplay display) {
+        UUID uuid = player.getUniqueId();
+        synchronizedHiders.add(uuid);
+
+        Location snapped = snappedBlockLocation(player.getLocation());
+        display.teleport(snapped);
+        BlockDisplay upper = upperDisguises.get(uuid);
+        if (upper != null && !upper.isDead()) {
+            upper.teleport(snapped.clone().add(0, 1, 0));
+        }
+
+        player.getWorld().playSound(player.getLocation(), Sound.BLOCK_STONE_PLACE, 1.0f, 1.4f);
+        player.getWorld().playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 2.0f);
+        player.sendMessage("§a[Prop Hunt] §f✔ Camouflage §asynchronisé§f — tu es fondu dans le décor. Ne bouge plus !");
+        updateScoreboards();
+    }
+
+    private Location snappedBlockLocation(Location loc) {
+        return new Location(loc.getWorld(),
+                Math.floor(loc.getX()), Math.floor(loc.getY()), Math.floor(loc.getZ()));
     }
 
     private Location centeredLocation(Location loc) {
@@ -541,8 +616,11 @@ public class PropHuntManager implements MiniGame {
     }
 
     private void clearDisguise(Player player) {
-        removeDisguiseEntities(player.getUniqueId());
-        lastLoc.remove(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        removeDisguiseEntities(uuid);
+        lastLoc.remove(uuid);
+        immobileTicks.remove(uuid);
+        synchronizedHiders.remove(uuid);
     }
 
     private void freezeSeeker(Player p) {

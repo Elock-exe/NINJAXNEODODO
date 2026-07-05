@@ -39,6 +39,9 @@ hotpotato:
   players-per-potato: 8
   min-timer-seconds: 15
   max-timer-seconds: 40
+  # Coup = effet "wind burst" (envoi en l'air), sans dégâts
+  windburst-strength: 0.9
+  windburst-lift: 0.55
   points:
     participation: 10
     win-bonus: 100
@@ -51,12 +54,15 @@ prophunt:
   points:
     participation: 10
     win-bonus: 100
+    # Points gagnés par seconde de survie, + bonus si survie jusqu'au bout
+    per-second: 2
+    survivor-bonus: 25
 
 disaster:
   round-duration-seconds: 45
   intermission-seconds: 5
   regen-after-game: true
-  max-regen-blocks: 1000000
+  max-regen-blocks: 2000000
 
   rounds:
     - meteor
@@ -74,6 +80,8 @@ disaster:
     fuse-ticks: 100
     spawn-height: 22.0
     set-fire: true
+    # Multiplicateur des dégâts d'explosion sur les joueurs (1.0 = normal, plus bas = font moins mal)
+    damage-multiplier: 0.35
   tornado:
     radius: 6.0
     pull-strength: 0.6
@@ -87,5 +95,18 @@ disaster:
   points:
     participation: 10
     win-bonus: 100
+
+# Musique de fond custom via NoteBlockAPI (chansons Note Block Studio .nbs).
+# Nécessite le plugin NoteBlockAPI installé sur le serveur.
+# Dépose tes fichiers .nbs dans : plugins/NinjaxxGames/songs/
+# "file" = nom du fichier .nbs, "volume" = 0 à 100. Laisser "file" vide pour couper un contexte.
+music:
+  enabled: true
+  hub:
+    file: "hub.nbs"
+    volume: 50
+  game:
+    file: "game.nbs"
+    volume: 50
 
 scores: {}

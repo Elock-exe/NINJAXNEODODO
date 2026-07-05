@@ -23,7 +23,9 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
             "setprophuntzone",
             "setdisasterzone", "setdisasterspectatorzone",
             "savedisastermap", "regendisastermap",
-            "start", "stop", "leaderboard", "resetleaderboard"
+            "start", "stop", "leaderboard", "resetleaderboard",
+            "lineplayers",
+            "setrankspawn", "setclassementroom", "classement"
     );
 
     public NinjaxxCommand(NinjaxxGames plugin) {
@@ -67,6 +69,10 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
             case "stop" -> handleStop(sender, args);
             case "leaderboard" -> handleLeaderboard(sender);
             case "resetleaderboard" -> handleResetLeaderboard(sender);
+            case "lineplayers" -> handleLinePlayers(sender, args);
+            case "setrankspawn" -> handleSetRankSpawn(sender, args);
+            case "setclassementroom" -> handleSetClassementRoom(sender);
+            case "classement" -> handleClassement(sender);
             default -> sender.sendMessage("§c[NinjaxxGames] Sous-commande inconnue : " + sub);
         }
         return true;
@@ -342,6 +348,67 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§a[NinjaxxGames] §fClassement réinitialisé — " + count + " joueur(s) remis à §e0§f.");
     }
 
+    private void handleLinePlayers(CommandSender sender, String[] args) {
+        Player leader = requirePlayer(sender);
+        if (leader == null) return;
+
+        // Nombre par rangée optionnel : /ninjaxx lineplayers [parRangée]
+        // Sans argument, il est calculé automatiquement selon le nombre de joueurs connectés.
+        Integer perRow = null;
+        if (args.length >= 2) {
+            try {
+                perRow = Math.max(1, Integer.parseInt(args[1]));
+            } catch (NumberFormatException e) {
+                leader.sendMessage("§c[NinjaxxGames] Nombre par rangée invalide : '" + args[1] + "' (entier attendu).");
+                return;
+            }
+        }
+
+        leader.sendMessage(plugin.getFormationManager().toggle(leader, perRow));
+    }
+
+    private void handleSetRankSpawn(CommandSender sender, String[] args) {
+        Player player = requirePlayer(sender);
+        if (player == null) return;
+        if (args.length < 2) {
+            player.sendMessage("§c[NinjaxxGames] Usage : /ninjaxx setrankspawn <1-"
+                    + com.ninjaxxgames.managers.PodiumManager.MAX_RANKS + ">");
+            return;
+        }
+        int rank;
+        try {
+            rank = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            player.sendMessage("§c[NinjaxxGames] Rang invalide : '" + args[1] + "' (entier attendu).");
+            return;
+        }
+        if (!plugin.getPodiumManager().setRankSpawn(rank, player.getLocation())) {
+            player.sendMessage("§c[NinjaxxGames] Le rang doit être entre 1 et "
+                    + com.ninjaxxgames.managers.PodiumManager.MAX_RANKS + ".");
+            return;
+        }
+        player.sendMessage("§a[NinjaxxGames] §fSpawn du §eTOP " + rank
+                + " §fdéfini à ta position exacte. §7(" + plugin.getPodiumManager().configuredRankCount()
+                + " rang(s) configuré(s))");
+    }
+
+    private void handleSetClassementRoom(CommandSender sender) {
+        Player player = requirePlayer(sender);
+        if (player == null) return;
+        plugin.getPodiumManager().setRoom(player.getLocation());
+        player.sendMessage("§a[NinjaxxGames] §fSalle de classement définie à ta position. "
+                + "§7Les joueurs hors top " + com.ninjaxxgames.managers.PodiumManager.MAX_RANKS + " y seront téléportés.");
+    }
+
+    private void handleClassement(CommandSender sender) {
+        String err = plugin.getPodiumManager().runCeremony();
+        if (err != null) {
+            sender.sendMessage("§c[NinjaxxGames] Impossible : " + err);
+            return;
+        }
+        sender.sendMessage("§a[NinjaxxGames] §fCérémonie de classement lancée ! §e🎆");
+    }
+
     private Player requirePlayer(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§c[NinjaxxGames] Cette commande doit être exécutée par un joueur.");
@@ -376,6 +443,13 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && (args[0].equalsIgnoreCase("start") || args[0].equalsIgnoreCase("stop"))) {
             return plugin.getEventManager().getAll().keySet().stream()
                     .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("setrankspawn")) {
+            List<String> ranks = new ArrayList<>();
+            for (int i = 1; i <= com.ninjaxxgames.managers.PodiumManager.MAX_RANKS; i++) {
+                ranks.add(String.valueOf(i));
+            }
+            return ranks.stream().filter(s -> s.startsWith(args[1])).toList();
         }
         return Collections.emptyList();
     }

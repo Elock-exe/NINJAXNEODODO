@@ -244,8 +244,7 @@ public class SquidGameManager implements MiniGame {
     private void scheduleGreenLight() {
         if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.GREEN_LIGHT;
-        broadcast("§a[Squid Game] §a●  GREEN LIGHT");
-        broadcastTitle("§a●  GREEN LIGHT", "§fTu peux avancer !");
+        // Feu signalé uniquement au son (pas d'affichage à l'écran).
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 2.0f);
         updateScoreboard();
         for (UUID uuid : activePlayers) {
@@ -270,8 +269,7 @@ public class SquidGameManager implements MiniGame {
 
     private void warnRedLight(long delayTicks) {
         if (phase == SquidGamePhase.FINISHED) return;
-        broadcast("§e[Squid Game] §6§l1, 2, 3... §7prépare-toi à t'arrêter !");
-        broadcastTitle("§e§l⚠ ATTENTION", "§cRed light imminent — §fSTOP bientôt !");
+        // Avertissement avant le rouge : uniquement au son.
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 0.8f);
         new BukkitRunnable() {
             @Override
@@ -293,8 +291,7 @@ public class SquidGameManager implements MiniGame {
     private void scheduleRedLight() {
         if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.RED_LIGHT;
-        broadcast("§c[Squid Game] §c●  RED LIGHT");
-        broadcastTitle("§c●  RED LIGHT", "§fNe bouge plus !");
+        // Feu rouge signalé uniquement au son (pas d'affichage à l'écran).
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f);
         updateScoreboard();
         for (UUID uuid : activePlayers) {
@@ -527,16 +524,6 @@ public class SquidGameManager implements MiniGame {
         for (UUID uuid : allInvolved()) {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p != null) p.sendMessage(message);
-        }
-    }
-
-    private void broadcastTitle(String title, String subtitle) {
-        String msg = (subtitle == null || subtitle.isEmpty()) ? title : title + " §7— " + subtitle;
-        for (UUID uuid : allInvolved()) {
-            Player p = plugin.getServer().getPlayer(uuid);
-            if (p != null) {
-                p.sendActionBar(net.kyori.adventure.text.Component.text(msg));
-            }
         }
     }
 

@@ -30,6 +30,9 @@ public final class NinjaxxGames extends JavaPlugin {
     private SelectionManager selectionManager;
     private TabListManager tabListManager;
     private HubScoreboardManager hubScoreboardManager;
+    private BackgroundMusicManager backgroundMusicManager;
+    private FormationManager formationManager;
+    private PodiumManager podiumManager;
 
     @Override
     public void onEnable() {
@@ -41,6 +44,8 @@ public final class NinjaxxGames extends JavaPlugin {
         this.scoreManager = new ScoreManager(this);
         this.sessionManager = new PlayerSessionManager();
         this.selectionManager = new SelectionManager();
+        this.formationManager = new FormationManager(this);
+        this.podiumManager = new PodiumManager(this);
         this.eventManager = new EventManager();
         this.gameManager = new GameManager(this);
 
@@ -68,6 +73,9 @@ public final class NinjaxxGames extends JavaPlugin {
         this.hubScoreboardManager = new HubScoreboardManager(this);
         hubScoreboardManager.start();
 
+        this.backgroundMusicManager = new BackgroundMusicManager(this);
+        backgroundMusicManager.start();
+
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new NinjaxxExpansion(this).register();
             getLogger().info("Hook PlaceholderAPI enregistré (placeholders %ninjaxx_...%).");
@@ -89,6 +97,9 @@ public final class NinjaxxGames extends JavaPlugin {
         if (hubScoreboardManager != null) {
             hubScoreboardManager.stop();
         }
+        if (backgroundMusicManager != null) {
+            backgroundMusicManager.stop();
+        }
         saveConfig();
         getLogger().info("NinjaxxGames désactivé.");
     }
@@ -103,4 +114,7 @@ public final class NinjaxxGames extends JavaPlugin {
     public SelectionManager getSelectionManager() { return selectionManager; }
     public TabListManager getTabListManager() { return tabListManager; }
     public HubScoreboardManager getHubScoreboardManager() { return hubScoreboardManager; }
+    public BackgroundMusicManager getBackgroundMusicManager() { return backgroundMusicManager; }
+    public FormationManager getFormationManager() { return formationManager; }
+    public PodiumManager getPodiumManager() { return podiumManager; }
 }
