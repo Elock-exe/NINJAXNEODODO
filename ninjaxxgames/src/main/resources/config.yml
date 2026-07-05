@@ -1,0 +1,91 @@
+server-state: OFF
+
+protect-zone-blocks: true
+disable-mob-spawning: true
+
+hub:
+  world: null
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  yaw: 0.0
+  pitch: 0.0
+
+lift-cooldown-seconds: 3
+
+lifts: {}
+
+zones: {}
+
+squidgame:
+  round-duration-seconds: 120
+  red-light-min-seconds: 3
+  red-light-max-seconds: 6
+  green-light-min-seconds: 4
+  green-light-max-seconds: 7
+  red-light-warning-seconds: 1.5
+  points:
+    participation: 10
+    win-bonus: 100
+
+crowngame:
+  round-duration-seconds: 180
+  crown-ratio: 0.5
+  points:
+    participation: 10
+    win-bonus: 100
+
+hotpotato:
+  players-per-potato: 8
+  min-timer-seconds: 15
+  max-timer-seconds: 40
+  points:
+    participation: 10
+    win-bonus: 100
+
+prophunt:
+  seekers-per-player: 10
+  hide-duration-seconds: 45
+  seek-duration-seconds: 180
+  hider-sound-interval-seconds: 20
+  points:
+    participation: 10
+    win-bonus: 100
+
+disaster:
+  round-duration-seconds: 45
+  intermission-seconds: 5
+  regen-after-game: true
+  max-regen-blocks: 1000000
+
+  rounds:
+    - meteor
+    - tornado
+    - lightning
+  dash:
+    enabled: true
+    strength: 1.4
+    up: 0.35
+    cooldown-seconds: 3
+  meteor:
+    interval-ticks: 12
+    count-per-wave: 2
+    power: 4.0
+    fuse-ticks: 100
+    spawn-height: 22.0
+    set-fire: true
+  tornado:
+    radius: 6.0
+    pull-strength: 0.6
+    lift-strength: 0.55
+    damage-per-second: 2.0
+    move-speed: 0.35
+  lightning:
+    interval-ticks: 40
+    strikes-per-wave: 1
+    target-players: false
+  points:
+    participation: 10
+    win-bonus: 100
+
+scores: {}
