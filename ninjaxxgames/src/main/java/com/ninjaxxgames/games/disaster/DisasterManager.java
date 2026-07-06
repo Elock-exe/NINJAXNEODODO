@@ -12,6 +12,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.WeatherType;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.BlockDisplay;
@@ -28,8 +29,12 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
+
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.*;
 
 public class DisasterManager implements MiniGame {
@@ -326,13 +331,9 @@ public class DisasterManager implements MiniGame {
         secondsLeft = Math.max(5, plugin.getConfig().getInt("disaster.round-duration-seconds", 45));
         vortices.clear();
 
-        broadcast("§8§m                                        ");
-        broadcast("§6§lVAGUE " + waveNumber + " §7— " + describeActive());
-        if (waveNumber > available) {
-            broadcast("§c§l⚠ INTENSITÉ x" + intensity + " §7— ça va faire mal.");
-        }
-        broadcast("§8§m                                        ");
-        broadcastTitle("§6§lVAGUE " + waveNumber, describeActive());
+        String intensityTag = waveNumber > available ? " §c§l⚠ x" + intensity : "";
+        broadcast("§6§lVAGUE " + waveNumber + " §7— " + describeActive() + intensityTag);
+        broadcastTitle("§6§lVAGUE " + waveNumber + intensityTag, describeActive());
         broadcastSound(Sound.ENTITY_ENDER_DRAGON_GROWL, 0.7f);
     }
 
@@ -344,7 +345,7 @@ public class DisasterManager implements MiniGame {
         stopAcidWeather();
         phase = Phase.INTERMISSION;
         secondsLeft = Math.max(1, plugin.getConfig().getInt("disaster.intermission-seconds", 5));
-        broadcast("§a[Disaster] §fAccalmie... la prochaine vague sera pire.");
+        broadcastTitle("§a§lACCALMIE", "§7La prochaine vague sera pire...");
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1.5f);
     }
 
@@ -464,15 +465,15 @@ public class DisasterManager implements MiniGame {
         }
 
         // En arracher de nouveaux autour de chaque tornade.
-        int maxTotal = 18 * vortices.size();
-        if (tornadoDebris.size() < maxTotal && tickCounter % 4 == 0) {
+        int maxTotal = 40 * vortices.size();
+        if (tornadoDebris.size() < maxTotal && tickCounter % 2 == 0) {
             for (Vortex v : vortices) {
                 Material ground = world.getBlockAt(v.center.getBlockX(),
                         (int) Math.floor(arena.getMinY()), v.center.getBlockZ()).getType();
                 if (ground.isAir() || !ground.isSolid()) {
                     ground = Material.DIRT;
                 }
-                for (int k = 0; k < 2; k++) {
+                for (int k = 0; k < 4; k++) {
                     double angle = random.nextDouble() * Math.PI * 2;
                     double radius = 1.0 + random.nextDouble() * 1.5;
                     double startH = random.nextDouble() * 2.0;
@@ -525,23 +526,23 @@ public class DisasterManager implements MiniGame {
             v.center.setX(clamp(v.center.getX(), arena.getMinX(), arena.getMaxX()));
             v.center.setZ(clamp(v.center.getZ(), arena.getMinZ(), arena.getMaxZ()));
 
-            // Tornade géante : entonnoir large, dense et très haut, visible de loin.
+            // Entonnoir allégé : peu de particules (les resource packs les masquent souvent),
+            // ce sont surtout les blocs emportés qui rendent la tornade visible.
             double funnelHeight = height * 2.0;
-            for (double h = 0; h < funnelHeight; h += 0.3) {
+            for (double h = 0; h < funnelHeight; h += 0.9) {
                 double r = 2.0 + h * 0.35;
-                for (int k = 0; k < 6; k++) {
-                    double ang = tickCounter * 0.5 + h * 0.6 + (Math.PI * 2.0 / 6.0) * k;
+                for (int k = 0; k < 3; k++) {
+                    double ang = tickCounter * 0.5 + h * 0.6 + (Math.PI * 2.0 / 3.0) * k;
                     double px = v.center.getX() + Math.cos(ang) * r;
                     double pz = v.center.getZ() + Math.sin(ang) * r;
                     Location pLoc = new Location(world, px, baseY + h, pz);
-                    world.spawnParticle(Particle.CLOUD, pLoc, 2, 0.2, 0.2, 0.2, 0.0);
-                    world.spawnParticle(Particle.LARGE_SMOKE, pLoc, 1, 0.15, 0.15, 0.15, 0.0);
+                    world.spawnParticle(Particle.CLOUD, pLoc, 1, 0.2, 0.2, 0.2, 0.0);
                 }
             }
             // Colonne centrale sombre pour bien la repérer de loin.
-            for (double h = 0; h < funnelHeight; h += 0.8) {
+            for (double h = 0; h < funnelHeight; h += 1.6) {
                 Location core = new Location(world, v.center.getX(), baseY + h, v.center.getZ());
-                world.spawnParticle(Particle.LARGE_SMOKE, core, 3, 0.4, 0.2, 0.4, 0.02);
+                world.spawnParticle(Particle.LARGE_SMOKE, core, 1, 0.4, 0.2, 0.4, 0.02);
             }
             if (tickCounter % 20 == 0) {
                 world.playSound(v.center, Sound.ENTITY_PHANTOM_FLAP, 2.0f, 0.4f);
@@ -639,6 +640,13 @@ public class DisasterManager implements MiniGame {
             world.setWeatherDuration(20 * 600);
             acidWeatherActive = true;
         }
+        // Force la pluie côté client (indépendant de la météo serveur), rafraîchie chaque seconde.
+        if (tickCounter % 20 == 0) {
+            for (UUID uuid : allInvolved()) {
+                Player p = plugin.getServer().getPlayer(uuid);
+                if (p != null) p.setPlayerWeather(WeatherType.DOWNFALL);
+            }
+        }
 
         // Pluie acide TRÈS visible : rideau de particules vertes qui tombent du ciel sur toute l'arène.
         int drops = Math.max(10, plugin.getConfig().getInt("disaster.acidrain.rain-particles", 40));
@@ -657,15 +665,18 @@ public class DisasterManager implements MiniGame {
         }
 
         // Dégâts sur les joueurs exposés au ciel : s'abriter sous un toit protège.
-        if (tickCounter % 20 == 0) {
-            double dps = plugin.getConfig().getDouble("disaster.acidrain.damage-per-second", 1.0);
+        int damageInterval = Math.max(1, (int) Math.round(
+                plugin.getConfig().getDouble("disaster.acidrain.damage-interval-seconds", 2.0) * 20));
+        if (tickCounter % damageInterval == 0) {
+            double damage = plugin.getConfig().getDouble("disaster.acidrain.damage-amount", 1.0);
             for (UUID uuid : new ArrayList<>(activePlayers)) {
                 Player p = plugin.getServer().getPlayer(uuid);
                 if (p == null) continue;
                 Location pl = p.getLocation();
                 if (!arena.contains(pl)) continue;
                 if (world.getHighestBlockYAt(pl) > pl.getBlockY()) continue;
-                p.damage(dps);
+                p.damage(damage);
+                p.sendActionBar(net.kyori.adventure.text.Component.text("§a☔ Pluie acide ! §fAbrite-toi sous un toit !"));
                 world.spawnParticle(Particle.DUST, pl.clone().add(0, 1.2, 0), 10, 0.3, 0.6, 0.3,
                         new Particle.DustOptions(Color.LIME, 1.1f));
                 p.playSound(pl, Sound.BLOCK_LAVA_EXTINGUISH, 0.25f, 1.8f);
@@ -702,6 +713,10 @@ public class DisasterManager implements MiniGame {
             world.setStorm(false);
             world.setThundering(false);
         }
+        for (UUID uuid : allInvolved()) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p != null) p.resetPlayerWeather();
+        }
         acidWeatherActive = false;
     }
 
@@ -718,16 +733,18 @@ public class DisasterManager implements MiniGame {
         int count = Math.min(baseCount + (intensity - 1), baseCount + 10);
         float damagePerBlock = (float) plugin.getConfig().getDouble("disaster.anvilrain.damage-per-block", 4.0);
         int maxDamage = plugin.getConfig().getInt("disaster.anvilrain.max-damage", 20);
-        double spawnHeight = plugin.getConfig().getDouble("disaster.anvilrain.spawn-height", 25.0);
-        double fallSpeed = plugin.getConfig().getDouble("disaster.anvilrain.fall-speed", 2.5);
+        double spawnHeight = plugin.getConfig().getDouble("disaster.anvilrain.spawn-height", 18.0);
+        double fallSpeed = plugin.getConfig().getDouble("disaster.anvilrain.fall-speed", 1.2);
 
         for (int i = 0; i < count; i++) {
             double x = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
             double z = arena.getMinZ() + random.nextDouble() * (arena.getMaxZ() - arena.getMinZ());
-            Location loc = new Location(world, x, arena.getMaxY() + spawnHeight, z);
+            // Clamp sous la limite du monde, sinon l'entité peut ne jamais apparaître.
+            double y = Math.min(arena.getMaxY() + spawnHeight, world.getMaxHeight() - 2.0);
+            Location loc = new Location(world, x, y, z);
 
             FallingBlock anvil = world.spawnFallingBlock(loc, Material.ANVIL.createBlockData());
-            // Vitesse de chute initiale vers le bas : les enclumes tombent beaucoup plus vite.
+            // Petite impulsion vers le bas : assez pour menacer, assez lent pour rester visible.
             anvil.setVelocity(new Vector(0, -fallSpeed, 0));
             anvil.setHurtEntities(true);
             anvil.setDamagePerBlock(damagePerBlock);
@@ -807,12 +824,12 @@ public class DisasterManager implements MiniGame {
             }
         }
 
-        int baseInterval = Math.max(20, plugin.getConfig().getInt("disaster.zombies.spawn-interval-ticks", 80));
+        int baseInterval = Math.max(20, plugin.getConfig().getInt("disaster.zombies.spawn-interval-ticks", 40));
         int interval = Math.max(20, baseInterval - (intensity - 1) * 10);
         if (tickCounter % interval != 0) return;
 
-        int maxAlive = Math.max(1, plugin.getConfig().getInt("disaster.zombies.max-alive", 8)) + (intensity - 1) * 2;
-        int perSpawn = Math.max(1, plugin.getConfig().getInt("disaster.zombies.per-spawn", 2));
+        int maxAlive = Math.max(1, plugin.getConfig().getInt("disaster.zombies.max-alive", 12)) + (intensity - 1) * 2;
+        int perSpawn = Math.max(1, plugin.getConfig().getInt("disaster.zombies.per-spawn", 3));
         int aliveCount = alive.size();
 
         for (int i = 0; i < perSpawn && aliveCount < maxAlive; i++) {
@@ -826,6 +843,7 @@ public class DisasterManager implements MiniGame {
                     z.getEquipment().setHelmet(new ItemStack(Material.IRON_HELMET));
                     z.getEquipment().setHelmetDropChance(0f);
                 }
+                z.setShouldBurnInDay(false);
                 z.setCanPickupItems(false);
                 z.setPersistent(true);
                 z.setRemoveWhenFarAway(false);
@@ -844,6 +862,10 @@ public class DisasterManager implements MiniGame {
 
     public boolean handleZombieDeath(UUID entityId) {
         return zombieEntities.remove(entityId);
+    }
+
+    public boolean isDisasterZombie(UUID entityId) {
+        return zombieEntities.contains(entityId);
     }
 
     private void clearZombies() {
@@ -1057,7 +1079,7 @@ public class DisasterManager implements MiniGame {
             p.setFlying(false);
             p.setAllowFlight(false);
             sendToSpectator(p);
-            p.sendMessage("§c[Disaster] §fTu es éliminé ! Direction la zone des spectateurs.");
+            sendTitle(p, "§c§lÉLIMINÉ", "§7Direction la zone des spectateurs");
         }
         broadcast(broadcastMessage);
 
@@ -1080,12 +1102,15 @@ public class DisasterManager implements MiniGame {
         running = false;
 
         if (activePlayers.isEmpty()) {
-            broadcast("§c[Disaster] §fPersonne n'a survécu... aucune catastrophe n'a fait de quartier.");
+            broadcastTitle("§c§lFIN", "§7Personne n'a survécu...");
         } else if (activePlayers.size() == 1) {
             Player wp = plugin.getServer().getPlayer(activePlayers.iterator().next());
-            broadcast("§6🏆 [Disaster] §e" + (wp != null ? wp.getName() : "?") + " §fest le seul survivant, il gagne !");
+            String name = wp != null ? wp.getName() : "?";
+            broadcast("§6🏆 [Disaster] §e" + name + " §fest le seul survivant, il gagne !");
+            broadcastTitle("§6🏆 §e" + name, "§fseul survivant, il gagne !");
         } else {
             broadcast("§6🏆 [Disaster] §e" + activePlayers.size() + " §fsurvivants ont tenu jusqu'au bout !");
+            broadcastTitle("§6🏆 §e" + activePlayers.size() + " survivants", "§fils ont tenu jusqu'au bout !");
         }
         awardPlacementPoints();
         cleanupAndReset();
@@ -1396,12 +1421,25 @@ public class DisasterManager implements MiniGame {
         }
     }
 
+    /** Affiche un vrai titre au centre de l'écran pour tous les joueurs concernés. */
     private void broadcastTitle(String title, String subtitle) {
-        String msg = (subtitle == null || subtitle.isEmpty()) ? title : title + " §7— " + subtitle;
+        Title t = buildTitle(title, subtitle);
         for (UUID uuid : allInvolved()) {
             Player p = plugin.getServer().getPlayer(uuid);
-            if (p != null) p.sendActionBar(net.kyori.adventure.text.Component.text(msg));
+            if (p != null) p.showTitle(t);
         }
+    }
+
+    private void sendTitle(Player p, String title, String subtitle) {
+        p.showTitle(buildTitle(title, subtitle));
+    }
+
+    private Title buildTitle(String title, String subtitle) {
+        LegacyComponentSerializer legacy = LegacyComponentSerializer.legacySection();
+        return Title.title(
+                legacy.deserialize(title == null ? "" : title),
+                legacy.deserialize(subtitle == null ? "" : subtitle),
+                Title.Times.times(Duration.ofMillis(200), Duration.ofMillis(1600), Duration.ofMillis(400)));
     }
 
     private void broadcastSound(Sound sound, float pitch) {

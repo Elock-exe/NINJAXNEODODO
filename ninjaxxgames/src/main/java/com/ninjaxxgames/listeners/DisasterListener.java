@@ -77,6 +77,21 @@ public class DisasterListener implements Listener {
         manager.handleAnvilLand(event);
     }
 
+    // Les zombies de l'invasion ne meurent pas des autres catastrophes (TNT, foudre, feu, enclumes) :
+    // seuls les joueurs et la fin de vague peuvent les tuer.
+    @EventHandler(ignoreCancelled = true)
+    public void onZombieDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Zombie zombie)) return;
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isRunning()) return;
+        if (!manager.isDisasterZombie(zombie.getUniqueId())) return;
+        switch (event.getCause()) {
+            case ENTITY_EXPLOSION, BLOCK_EXPLOSION, LIGHTNING, FIRE, FIRE_TICK, FALLING_BLOCK ->
+                    event.setCancelled(true);
+            default -> { }
+        }
+    }
+
     @EventHandler
     public void onZombieDeath(EntityDeathEvent event) {
         if (!(event.getEntity() instanceof Zombie zombie)) return;
