@@ -258,9 +258,9 @@ public class DisasterManager implements MiniGame {
     private List<String> resolveRoundSequence() {
         List<String> configured = plugin.getConfig().getStringList("disaster.rounds");
         if (configured.isEmpty()) {
-            configured = List.of("meteor", "tornado", "lightning", "acidrain", "anvilrain", "zombies");
+            configured = List.of("meteor", "tornado", "lightning", "acidrain", "anvilrain", "zombies", "purge");
         }
-        Set<String> known = Set.of("meteor", "tornado", "lightning", "acidrain", "anvilrain", "zombies");
+        Set<String> known = Set.of("meteor", "tornado", "lightning", "acidrain", "anvilrain", "zombies", "purge");
         List<String> valid = new ArrayList<>();
         for (String d : configured) {
             String key = d.toLowerCase(Locale.ROOT).trim();
@@ -290,6 +290,7 @@ public class DisasterManager implements MiniGame {
                     case "acidrain" -> acidRainTick();
                     case "anvilrain" -> anvilRainTick();
                     case "zombies" -> zombieTick();
+                    case "purge" -> purgeTick();
                     default -> { }
                 }
             }
@@ -823,6 +824,20 @@ public class DisasterManager implements MiniGame {
         anvilEntities.clear();
     }
 
+    private void purgeTick() {
+        if (tickCounter % 100 != 0) return;
+        for (UUID uuid : activePlayers) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p != null) {
+                p.sendActionBar(net.kyori.adventure.text.Component.text("§4⚔ PURGE §f— le PvP est activé, chasse ou fuis !"));
+            }
+        }
+    }
+
+    public boolean isPurgeActive() {
+        return running && phase == Phase.DISASTER && activeDisasters.contains("purge");
+    }
+
     private void zombieTick() {
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());
@@ -1318,6 +1333,7 @@ public class DisasterManager implements MiniGame {
                 case "acidrain" -> "§a☔";
                 case "anvilrain" -> "§7⚒";
                 case "zombies" -> "§2☠";
+                case "purge" -> "§4⚔";
                 default -> "";
             });
         }
@@ -1332,6 +1348,7 @@ public class DisasterManager implements MiniGame {
             case "acidrain" -> "§a☔ Pluie acide";
             case "anvilrain" -> "§7⚒ Pluie d'enclumes";
             case "zombies" -> "§2☠ Invasion de zombies";
+            case "purge" -> "§4⚔ Purge (PvP)";
             default -> "§7" + disaster;
         };
     }

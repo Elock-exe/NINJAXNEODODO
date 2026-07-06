@@ -12,6 +12,9 @@ public class GameManager {
     }
 
     public StartResult start(String gameId) {
+        if (plugin.getInterludeManager() != null && plugin.getInterludeManager().isRunning()) {
+            return new StartResult(false, "une interlude PvP est en cours — attends la fin ou /ninjaxx interlude pour l'arrêter");
+        }
         MiniGame game = plugin.getEventManager().get(gameId);
         if (game == null) {
             return new StartResult(false, "mode inconnu : " + gameId);

@@ -38,6 +38,7 @@ public final class NinjaxxGames extends JavaPlugin {
     private BackgroundMusicManager backgroundMusicManager;
     private FormationManager formationManager;
     private PodiumManager podiumManager;
+    private InterludeManager interludeManager;
 
     @Override
     public void onEnable() {
@@ -53,6 +54,7 @@ public final class NinjaxxGames extends JavaPlugin {
         this.podiumManager = new PodiumManager(this);
         this.eventManager = new EventManager();
         this.gameManager = new GameManager(this);
+        this.interludeManager = new InterludeManager(this);
 
         eventManager.register(new SquidGameManager(this));
         eventManager.register(new CrownGameManager(this));
@@ -98,6 +100,9 @@ public final class NinjaxxGames extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (interludeManager != null && interludeManager.isRunning()) {
+            interludeManager.end();
+        }
         if (eventManager != null) {
             eventManager.getAll().values().forEach(g -> {
                 if (g.isRunning()) g.stop();
@@ -129,6 +134,7 @@ public final class NinjaxxGames extends JavaPlugin {
     public BackgroundMusicManager getBackgroundMusicManager() { return backgroundMusicManager; }
     public FormationManager getFormationManager() { return formationManager; }
     public PodiumManager getPodiumManager() { return podiumManager; }
+    public InterludeManager getInterludeManager() { return interludeManager; }
 
     public void sendToHub(Player player) {
         sessionManager.clear(player.getUniqueId());

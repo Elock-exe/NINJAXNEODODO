@@ -33,6 +33,9 @@ public class PlayerJoinListener implements Listener {
             }
             giveSteak(player);
             applySaturation(player);
+            if (plugin.getInterludeManager() != null) {
+                plugin.getInterludeManager().sanitize(player);
+            }
             if (plugin.getHubScoreboardManager() != null) {
                 plugin.getHubScoreboardManager().show(player);
             }

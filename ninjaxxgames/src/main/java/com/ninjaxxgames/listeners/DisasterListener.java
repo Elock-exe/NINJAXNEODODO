@@ -172,7 +172,8 @@ public class DisasterListener implements Listener {
         if (manager == null || !manager.isActive(player.getUniqueId())) return;
 
         if (event instanceof EntityDamageByEntityEvent byEntity
-                && plugin.getConfig().getBoolean("disaster.prevent-pvp", true)) {
+                && plugin.getConfig().getBoolean("disaster.prevent-pvp", true)
+                && !manager.isPurgeActive()) {
             Entity damager = byEntity.getDamager();
             boolean fromPlayer = damager instanceof Player
                     || (damager instanceof Projectile proj && proj.getShooter() instanceof Player);

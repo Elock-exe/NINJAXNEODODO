@@ -92,6 +92,8 @@ disaster:
     - acidrain
     - anvilrain
     - zombies
+    # purge : le PvP (normalement coupé) est activé pendant cette vague
+    - purge
   dash:
     enabled: true
     strength: 1.4
@@ -157,6 +159,12 @@ disaster:
   points:
     participation: 10
     win-bonus: 100
+
+# Interlude PvP entre deux events (/ninjaxx interlude) : épée en bois pour tous,
+# points par kill ajoutés au leaderboard à la fin, aucun jeu ne peut être lancé pendant.
+interlude:
+  duration-seconds: 120
+  points-per-kill: 30
 
 # Musique de fond custom via NoteBlockAPI (chansons Note Block Studio .nbs).
 # Nécessite le plugin NoteBlockAPI installé sur le serveur.
