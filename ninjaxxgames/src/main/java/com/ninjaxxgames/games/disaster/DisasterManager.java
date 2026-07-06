@@ -486,20 +486,17 @@ public class DisasterManager implements MiniGame {
             d.display.teleport(new Location(world, px, baseY + d.height, pz));
         }
 
-        int maxTotal = 60 * vortices.size();
-        if (tornadoDebris.size() < maxTotal && tickCounter % 2 == 0) {
+        int maxTotal = 100 * vortices.size();
+        if (tornadoDebris.size() < maxTotal) {
             for (Vortex v : vortices) {
-                Material ground = world.getBlockAt(v.center.getBlockX(),
-                        (int) Math.floor(arena.getMinY()), v.center.getBlockZ()).getType();
-                if (ground.isAir() || !ground.isSolid()) {
-                    ground = Material.DIRT;
-                }
-                for (int k = 0; k < 6; k++) {
+                for (int k = 0; k < 8; k++) {
                     double angle = random.nextDouble() * Math.PI * 2;
                     double radius = 1.0 + random.nextDouble() * 1.5;
                     double startH = random.nextDouble() * 2.0;
                     double px = v.center.getX() + Math.cos(angle) * radius - 0.5;
                     double pz = v.center.getZ() + Math.sin(angle) * radius - 0.5;
+                    Material ground = surfaceMaterialAt(world, arena,
+                            (int) Math.floor(px + 0.5), (int) Math.floor(pz + 0.5));
                     Location loc = new Location(world, px, baseY + startH, pz);
                     BlockDisplay display = world.spawn(loc, BlockDisplay.class);
                     display.setBlock(ground.createBlockData());
@@ -508,6 +505,17 @@ public class DisasterManager implements MiniGame {
                 }
             }
         }
+    }
+
+    private Material surfaceMaterialAt(World world, Zone arena, int x, int z) {
+        int yTop = Math.min(world.getHighestBlockYAt(x, z), (int) arena.getMaxY() - 1);
+        for (int y = yTop; y >= (int) arena.getMinY(); y--) {
+            Material m = world.getBlockAt(x, y, z).getType();
+            if (m.isAir() || !m.isSolid()) continue;
+            if (m == Material.BEDROCK || m == Material.BARRIER) continue;
+            return m;
+        }
+        return Material.DIRT;
     }
 
     private void clearTornadoDebris() {
