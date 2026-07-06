@@ -48,6 +48,8 @@ public class DisasterManager implements MiniGame {
     private static final String SUPPLY_SLIME_NAME = "§a✦ Bloc de slime";
     private static final String SUPPLY_STEAK_NAME = "§6✦ Steak";
     private static final String SUPPLY_GAPPLE_NAME = "§e✦ Pomme dorée";
+    private static final String SUPPLY_SWORD_NAME = "§7✦ Épée en pierre";
+    private static final String SUPPLY_WINDCHARGE_NAME = "§b✦ Wind Charge";
 
     private final NinjaxxGames plugin;
     private final GlowSidebar scoreboard = new GlowSidebar(ChatColor.GOLD, "disaster_glow", "disaster_sb");
@@ -1024,7 +1026,7 @@ public class DisasterManager implements MiniGame {
     }
 
     private ItemStack randomSupplyItem() {
-        return switch (random.nextInt(5)) {
+        return switch (random.nextInt(7)) {
             case 0 -> namedItem(new ItemStack(Material.WATER_BUCKET), SUPPLY_BUCKET_NAME,
                     "§7Pose de l'eau §f(consommé après usage)");
             case 1 -> healPotion();
@@ -1032,9 +1034,24 @@ public class DisasterManager implements MiniGame {
                     "§7Pose-le : il devient un jump pad !");
             case 3 -> namedItem(new ItemStack(Material.GOLDEN_APPLE), SUPPLY_GAPPLE_NAME,
                     "§7Absorption + régénération");
+            case 4 -> supplySword();
+            case 5 -> namedItem(new ItemStack(Material.WIND_CHARGE, 3), SUPPLY_WINDCHARGE_NAME,
+                    "§7Lance-la : repousse les ennemis et te propulse !");
             default -> namedItem(new ItemStack(Material.COOKED_BEEF, 2), SUPPLY_STEAK_NAME,
                     "§7Un petit encas de survie");
         };
+    }
+
+    private ItemStack supplySword() {
+        ItemStack item = new ItemStack(Material.STONE_SWORD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(SUPPLY_SWORD_NAME);
+            meta.setLore(List.of("§7Idéale contre les zombies... ou pendant la §4⚔ Purge"));
+            meta.setUnbreakable(true);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private ItemStack healPotion() {
@@ -1071,7 +1088,8 @@ public class DisasterManager implements MiniGame {
         String name = meta.getDisplayName();
         return SUPPLY_BUCKET_NAME.equals(name) || SUPPLY_POTION_NAME.equals(name)
                 || SUPPLY_SLIME_NAME.equals(name) || SUPPLY_STEAK_NAME.equals(name)
-                || SUPPLY_GAPPLE_NAME.equals(name);
+                || SUPPLY_GAPPLE_NAME.equals(name) || SUPPLY_SWORD_NAME.equals(name)
+                || SUPPLY_WINDCHARGE_NAME.equals(name);
     }
 
     public boolean isInArena(Location loc) {
@@ -1352,7 +1370,7 @@ public class DisasterManager implements MiniGame {
         broadcast("§7• Chaque vague §cAJOUTE §7une catastrophe et §cs'intensifie§7.");
         broadcast("§7• Elles se §ecombinent §7(météorites + tornade + éclairs...) jusqu'au §6dernier survivant§7.");
         broadcast("§7• §b🪶 Plume §7: §eclic droit §7= petit dash pour esquiver.");
-        broadcast("§7• §6✦ Ravitaillements §7: des objets apparaissent sur la map (§beau§7, §dsoin§7, §aslime jump pad§7, §esteak§7, §epomme dorée§7).");
+        broadcast("§7• §6✦ Ravitaillements §7: des objets apparaissent sur la map (§beau§7, §dsoin§7, §aslime jump pad§7, §esteak§7, §epomme dorée§7, §7épée§7, §bwind charge§7).");
         broadcast("§7• Meurs = §céliminé§7. Escalade des catastrophes : §f" + describeSequence());
         broadcast("§7• Tes points dépendent de ta §ePLACE finale§7.");
         broadcast("§8§m                                        ");
