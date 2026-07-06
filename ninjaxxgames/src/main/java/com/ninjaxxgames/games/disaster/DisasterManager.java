@@ -45,6 +45,7 @@ public class DisasterManager implements MiniGame {
     private static final String SUPPLY_POTION_NAME = "§d✚ Potion de soin";
     private static final String SUPPLY_SLIME_NAME = "§a✦ Bloc de slime";
     private static final String SUPPLY_STEAK_NAME = "§6✦ Steak";
+    private static final String SUPPLY_GAPPLE_NAME = "§e✦ Pomme dorée";
 
     private final NinjaxxGames plugin;
     private final GlowSidebar scoreboard = new GlowSidebar(ChatColor.GOLD, "disaster_glow", "disaster_sb");
@@ -407,6 +408,33 @@ public class DisasterManager implements MiniGame {
         UUID id = event.getEntity().getUniqueId();
         if (!meteorEntities.remove(id)) return;
         event.setYield(0f);
+
+        Location center = event.getLocation();
+        World world = center.getWorld();
+        double blast = plugin.getConfig().getDouble("disaster.meteor.power", 4.0) + 1.0;
+        double blastSq = blast * blast;
+
+        for (UUID itemId : new ArrayList<>(supplyItems)) {
+            if (plugin.getServer().getEntity(itemId) instanceof Item item
+                    && item.getWorld().equals(world)
+                    && item.getLocation().distanceSquared(center) <= blastSq) {
+                item.remove();
+                supplyItems.remove(itemId);
+            }
+        }
+
+        if (world != null) {
+            for (FallingBlock fb : world.getEntitiesByClass(FallingBlock.class)) {
+                if (!anvilEntities.contains(fb.getUniqueId())) continue;
+                if (fb.getLocation().distanceSquared(center) > blastSq) continue;
+                anvilEntities.remove(fb.getUniqueId());
+                world.spawnParticle(Particle.BLOCK, fb.getLocation(), 20, 0.4, 0.4, 0.4,
+                        Material.ANVIL.createBlockData());
+                world.playSound(fb.getLocation(), Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.1f);
+                fb.remove();
+            }
+        }
+
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         if (arena == null) return;
 
@@ -458,7 +486,7 @@ public class DisasterManager implements MiniGame {
             d.display.teleport(new Location(world, px, baseY + d.height, pz));
         }
 
-        int maxTotal = 40 * vortices.size();
+        int maxTotal = 60 * vortices.size();
         if (tornadoDebris.size() < maxTotal && tickCounter % 2 == 0) {
             for (Vortex v : vortices) {
                 Material ground = world.getBlockAt(v.center.getBlockX(),
@@ -466,7 +494,7 @@ public class DisasterManager implements MiniGame {
                 if (ground.isAir() || !ground.isSolid()) {
                     ground = Material.DIRT;
                 }
-                for (int k = 0; k < 4; k++) {
+                for (int k = 0; k < 6; k++) {
                     double angle = random.nextDouble() * Math.PI * 2;
                     double radius = 1.0 + random.nextDouble() * 1.5;
                     double startH = random.nextDouble() * 2.0;
@@ -644,7 +672,8 @@ public class DisasterManager implements MiniGame {
         int damageInterval = Math.max(1, (int) Math.round(
                 plugin.getConfig().getDouble("disaster.acidrain.damage-interval-seconds", 2.0) * 20));
         if (tickCounter % damageInterval == 0) {
-            double damage = plugin.getConfig().getDouble("disaster.acidrain.damage-amount", 1.0);
+            double damage = plugin.getConfig().getDouble("disaster.acidrain.damage-amount", 1.0)
+                    + (intensity - 1) * 0.5;
             for (UUID uuid : new ArrayList<>(activePlayers)) {
                 Player p = plugin.getServer().getPlayer(uuid);
                 if (p == null) continue;
@@ -697,16 +726,18 @@ public class DisasterManager implements MiniGame {
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());
         if (world == null) return;
 
-        int baseInterval = Math.max(6, plugin.getConfig().getInt("disaster.anvilrain.interval-ticks", 18));
-        int interval = Math.max(6, baseInterval - (intensity - 1) * 2);
+        impactLandedAnvils(world);
+
+        int baseInterval = Math.max(1, plugin.getConfig().getInt("disaster.anvilrain.interval-ticks", 10));
+        int interval = Math.max(2, baseInterval - (intensity - 1) * 2);
         if (tickCounter % interval != 0) return;
 
-        int baseCount = Math.max(1, plugin.getConfig().getInt("disaster.anvilrain.count-per-wave", 2));
-        int count = Math.min(baseCount + (intensity - 1), baseCount + 10);
+        int baseCount = Math.max(1, plugin.getConfig().getInt("disaster.anvilrain.count-per-wave", 6));
+        int count = Math.min(baseCount + (intensity - 1) * 2, baseCount + 24);
         float damagePerBlock = (float) plugin.getConfig().getDouble("disaster.anvilrain.damage-per-block", 4.0);
         int maxDamage = plugin.getConfig().getInt("disaster.anvilrain.max-damage", 20);
-        double spawnHeight = plugin.getConfig().getDouble("disaster.anvilrain.spawn-height", 18.0);
-        double fallSpeed = plugin.getConfig().getDouble("disaster.anvilrain.fall-speed", 1.2);
+        double spawnHeight = plugin.getConfig().getDouble("disaster.anvilrain.spawn-height", 22.0);
+        double fallSpeed = plugin.getConfig().getDouble("disaster.anvilrain.fall-speed", 1.6);
 
         for (int i = 0; i < count; i++) {
             double x = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
@@ -721,17 +752,30 @@ public class DisasterManager implements MiniGame {
             anvil.setMaxDamage(maxDamage);
             anvil.setDropItem(false);
             anvilEntities.add(anvil.getUniqueId());
+        }
+        world.playSound(world.getSpawnLocation(), Sound.BLOCK_ANVIL_PLACE, 0.3f, 0.5f);
+    }
 
-            world.spawnParticle(Particle.LARGE_SMOKE, loc, 5, 0.2, 0.2, 0.2, 0.0);
+    private void impactLandedAnvils(World world) {
+        for (FallingBlock fb : world.getEntitiesByClass(FallingBlock.class)) {
+            if (!anvilEntities.contains(fb.getUniqueId())) continue;
+            Location l = fb.getLocation();
+            boolean solidBelow = world.getBlockAt(l.getBlockX(),
+                    (int) Math.floor(l.getY() - 0.1), l.getBlockZ()).getType().isSolid();
+            if (fb.isOnGround() || solidBelow) {
+                anvilImpact(fb, l);
+            }
         }
     }
 
-    public void handleAnvilLand(org.bukkit.event.entity.EntityChangeBlockEvent event) {
-        if (!anvilEntities.remove(event.getEntity().getUniqueId())) return;
-        event.setCancelled(true);
+    private void anvilImpact(org.bukkit.entity.Entity anvil, Location impact) {
+        if (!anvilEntities.remove(anvil.getUniqueId())) return;
+        World world = impact.getWorld();
+        if (world == null) {
+            anvil.remove();
+            return;
+        }
 
-        World world = event.getBlock().getWorld();
-        Location impact = event.getBlock().getLocation().add(0.5, 0.5, 0.5);
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         int radius = Math.max(0, plugin.getConfig().getInt("disaster.anvilrain.break-radius", 1));
         if (arena != null) {
@@ -749,7 +793,13 @@ public class DisasterManager implements MiniGame {
         }
         world.playSound(impact, Sound.BLOCK_ANVIL_LAND, 1f, 0.8f);
         world.spawnParticle(Particle.BLOCK, impact, 30, 0.5, 0.3, 0.5, Material.ANVIL.createBlockData());
-        event.getEntity().remove();
+        anvil.remove();
+    }
+
+    public void handleAnvilLand(org.bukkit.event.entity.EntityChangeBlockEvent event) {
+        if (!anvilEntities.contains(event.getEntity().getUniqueId())) return;
+        event.setCancelled(true);
+        anvilImpact(event.getEntity(), event.getBlock().getLocation().add(0.5, 0.5, 0.5));
     }
 
     private void clearAnvils() {
@@ -793,12 +843,12 @@ public class DisasterManager implements MiniGame {
             }
         }
 
-        int baseInterval = Math.max(20, plugin.getConfig().getInt("disaster.zombies.spawn-interval-ticks", 40));
-        int interval = Math.max(20, baseInterval - (intensity - 1) * 10);
+        int baseInterval = Math.max(20, plugin.getConfig().getInt("disaster.zombies.spawn-interval-ticks", 30));
+        int interval = Math.max(20, baseInterval - (intensity - 1) * 5);
         if (tickCounter % interval != 0) return;
 
-        int maxAlive = Math.max(1, plugin.getConfig().getInt("disaster.zombies.max-alive", 12)) + (intensity - 1) * 2;
-        int perSpawn = Math.max(1, plugin.getConfig().getInt("disaster.zombies.per-spawn", 3));
+        int maxAlive = Math.max(1, plugin.getConfig().getInt("disaster.zombies.max-alive", 18)) + (intensity - 1) * 3;
+        int perSpawn = Math.max(1, plugin.getConfig().getInt("disaster.zombies.per-spawn", 4));
         int aliveCount = alive.size();
 
         for (int i = 0; i < perSpawn && aliveCount < maxAlive; i++) {
@@ -905,12 +955,14 @@ public class DisasterManager implements MiniGame {
     }
 
     private ItemStack randomSupplyItem() {
-        return switch (random.nextInt(4)) {
+        return switch (random.nextInt(5)) {
             case 0 -> namedItem(new ItemStack(Material.WATER_BUCKET), SUPPLY_BUCKET_NAME,
                     "§7Pose de l'eau §f(consommé après usage)");
             case 1 -> healPotion();
             case 2 -> namedItem(new ItemStack(Material.SLIME_BLOCK), SUPPLY_SLIME_NAME,
-                    "§7Pose-le pour amortir tes chutes");
+                    "§7Pose-le : il devient un jump pad !");
+            case 3 -> namedItem(new ItemStack(Material.GOLDEN_APPLE), SUPPLY_GAPPLE_NAME,
+                    "§7Absorption + régénération");
             default -> namedItem(new ItemStack(Material.COOKED_BEEF, 2), SUPPLY_STEAK_NAME,
                     "§7Un petit encas de survie");
         };
@@ -949,7 +1001,8 @@ public class DisasterManager implements MiniGame {
         if (meta == null || !meta.hasDisplayName()) return false;
         String name = meta.getDisplayName();
         return SUPPLY_BUCKET_NAME.equals(name) || SUPPLY_POTION_NAME.equals(name)
-                || SUPPLY_SLIME_NAME.equals(name) || SUPPLY_STEAK_NAME.equals(name);
+                || SUPPLY_SLIME_NAME.equals(name) || SUPPLY_STEAK_NAME.equals(name)
+                || SUPPLY_GAPPLE_NAME.equals(name);
     }
 
     public boolean isInArena(Location loc) {
@@ -1228,7 +1281,7 @@ public class DisasterManager implements MiniGame {
         broadcast("§7• Chaque vague §cAJOUTE §7une catastrophe et §cs'intensifie§7.");
         broadcast("§7• Elles se §ecombinent §7(météorites + tornade + éclairs...) jusqu'au §6dernier survivant§7.");
         broadcast("§7• §b🪶 Plume §7: §eclic droit §7= petit dash pour esquiver.");
-        broadcast("§7• §6✦ Ravitaillements §7: des objets apparaissent sur la map (§beau§7, §dsoin§7, §aslime§7, §6steak§7).");
+        broadcast("§7• §6✦ Ravitaillements §7: des objets apparaissent sur la map (§beau§7, §dsoin§7, §aslime jump pad§7, §esteak§7, §epomme dorée§7).");
         broadcast("§7• Meurs = §céliminé§7. Escalade des catastrophes : §f" + describeSequence());
         broadcast("§7• Tes points dépendent de ta §ePLACE finale§7.");
         broadcast("§8§m                                        ");

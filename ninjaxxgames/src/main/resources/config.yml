@@ -129,21 +129,21 @@ disaster:
     dissolve-interval-ticks: 30
     dissolve-per-cycle: 2
   anvilrain:
+    # Même fonctionnement que les météorites : spawn au-dessus de l'arène, impact détecté au sol
     interval-ticks: 10
     count-per-wave: 6
     # Dégâts par bloc de chute (une enclume qui tombe de haut fait très mal)
     damage-per-block: 4.0
     max-damage: 20
-    spawn-height: 18.0
-    # Vitesse de chute initiale. Attention : au-delà de ~1.5 les enclumes deviennent quasi
-    # invisibles (le client n'a pas le temps de les afficher avant l'impact).
-    fall-speed: 1.2
+    spawn-height: 22.0
+    # Vitesse de chute initiale (même valeur que les météorites TNT)
+    fall-speed: 1.6
     # Rayon de blocs cassés à l'impact (0 = aucun dégât aux constructions)
     break-radius: 1
   zombies:
-    spawn-interval-ticks: 40
-    per-spawn: 3
-    max-alive: 12
+    spawn-interval-ticks: 30
+    per-spawn: 4
+    max-alive: 18
   # Ravitaillements : objets spéciaux qui apparaissent aléatoirement dans l'arène
   # (seau d'eau à usage unique, potion de soin, bloc de slime, steak — tiré au hasard)
   supply:
@@ -152,6 +152,8 @@ disaster:
     max-on-ground: 12
     # Nombre d'items déposés à chaque cycle
     per-cycle: 3
+    # Force du saut quand on marche sur un bloc de slime posé (jump pad)
+    slime-jump-strength: 1.1
   points:
     participation: 10
     win-bonus: 100

@@ -21,11 +21,15 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.Sound;
+import org.bukkit.block.BlockFace;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Vector;
 
 public class DisasterListener implements Listener {
 
@@ -50,6 +54,22 @@ public class DisasterListener implements Listener {
 
         event.setCancelled(true);
         manager.handleDash(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onSlimeJump(PlayerMoveEvent event) {
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
+        Player player = event.getPlayer();
+        if (!player.isOnGround()) return;
+        if (player.getLocation().getBlock().getRelative(BlockFace.DOWN).getType() != Material.SLIME_BLOCK) return;
+
+        double strength = plugin.getConfig().getDouble("disaster.supply.slime-jump-strength", 1.1);
+        Vector velocity = player.getVelocity();
+        velocity.setY(strength);
+        player.setFallDistance(0f);
+        player.setVelocity(velocity);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1f, 0.8f);
     }
 
     @EventHandler
