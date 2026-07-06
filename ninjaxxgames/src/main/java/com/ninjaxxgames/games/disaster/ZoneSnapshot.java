@@ -91,10 +91,6 @@ public final class ZoneSnapshot {
         }
     }
 
-    /**
-     * Régénère la zone progressivement, {@code blocksPerTick} blocs par tick, pour éviter le gel
-     * du serveur lors de la restauration de très grandes arènes.
-     */
     public void restoreProgressive(org.bukkit.plugin.Plugin plugin, World world, int blocksPerTick) {
         if (world == null) return;
         final long total = (long) sizeX * sizeY * sizeZ;

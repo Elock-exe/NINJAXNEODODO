@@ -25,7 +25,6 @@ public class PlayerMoveListener implements Listener {
     public void onMove(PlayerMoveEvent event) {
         if (event.getTo() == null) return;
 
-        // Joueurs gelés par /ninjaxx lineplayers : position verrouillée, on n'exécute rien d'autre.
         if (plugin.getFormationManager().handleMove(event)) {
             return;
         }
@@ -73,7 +72,6 @@ public class PlayerMoveListener implements Listener {
         announceGame(player, game.getDisplayName());
     }
 
-    /** Gros titre au centre de l'écran indiquant le mode de jeu rejoint. */
     private void announceGame(Player player, String gameName) {
         Title title = Title.title(
                 LegacyComponentSerializer.legacySection().deserialize("§6§l" + gameName),

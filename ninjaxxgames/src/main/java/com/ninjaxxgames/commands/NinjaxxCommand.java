@@ -23,7 +23,7 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
             "setprophuntzone",
             "setdisasterzone", "setdisasterspectatorzone",
             "savedisastermap", "regendisastermap",
-            "start", "stop", "leaderboard", "resetleaderboard",
+            "start", "stop", "interlude", "leaderboard", "resetleaderboard",
             "lineplayers",
             "setrankspawn", "setclassementroom", "classement"
     );
@@ -67,6 +67,7 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
             case "regendisastermap" -> handleRegenDisasterMap(sender);
             case "start" -> handleStart(sender, args);
             case "stop" -> handleStop(sender, args);
+            case "interlude" -> handleInterlude(sender);
             case "leaderboard" -> handleLeaderboard(sender);
             case "resetleaderboard" -> handleResetLeaderboard(sender);
             case "lineplayers" -> handleLinePlayers(sender, args);
@@ -327,6 +328,21 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleInterlude(CommandSender sender) {
+        var interlude = plugin.getInterludeManager();
+        if (interlude.isRunning()) {
+            interlude.end();
+            sender.sendMessage("§a[NinjaxxGames] §fInterlude arrêtée — épées retirées, points attribués.");
+            return;
+        }
+        String error = interlude.start();
+        if (error != null) {
+            sender.sendMessage("§c[NinjaxxGames] Impossible de lancer l'interlude : " + error);
+        } else {
+            sender.sendMessage("§a[NinjaxxGames] §fInterlude PvP lancée ! Relance la commande pour l'arrêter avant la fin.");
+        }
+    }
+
     private void handleLeaderboard(CommandSender sender) {
         var top = plugin.getScoreManager().getTopScores(10);
         if (top.isEmpty()) {
@@ -352,8 +368,6 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
         Player leader = requirePlayer(sender);
         if (leader == null) return;
 
-        // Nombre par rangée optionnel : /ninjaxx lineplayers [parRangée]
-        // Sans argument, il est calculé automatiquement selon le nombre de joueurs connectés.
         Integer perRow = null;
         if (args.length >= 2) {
             try {

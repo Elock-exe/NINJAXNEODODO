@@ -34,7 +34,7 @@ public class PropHuntManager implements MiniGame {
     private static final String TOOL_NAME = "§a§lCAMOUFLAGE §7(clic droit sur un bloc)";
     private static final String SEEKER_SWORD_NAME = "§c🗡 Traqueur";
     private static final String SB_TITLE = "§b§l🔍 PROP HUNT";
-    private static final int SYNC_TICKS = 60; // 3 secondes immobile avant synchronisation
+    private static final int SYNC_TICKS = 60;
 
     private record Taunt(Material material, String name, Sound sound) {}
 
@@ -395,7 +395,6 @@ public class PropHuntManager implements MiniGame {
             return;
         }
 
-        // Le caché encaisse le coup mais n'est pas encore démasqué : il faut d'autres coups.
         hiderHealth.put(victimId, remaining);
         victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
         attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.2f);
@@ -528,8 +527,6 @@ public class PropHuntManager implements MiniGame {
 
         BlockData lowerData = data;
         BlockData upperData = null;
-        // Seuls les vrais blocs de 2 de haut (portes, grandes plantes) se dédoublent.
-        // Les escaliers/trappes sont "Bisected" mais ne font qu'un bloc : on ne crée PAS de bloc au-dessus.
         boolean twoTall = data instanceof Bisected
                 && !(data instanceof org.bukkit.block.data.type.Stairs)
                 && !(data instanceof org.bukkit.block.data.type.TrapDoor);
@@ -562,7 +559,6 @@ public class PropHuntManager implements MiniGame {
         player.sendMessage("§a[Prop Hunt] §fTu es déguisé en §e" + data.getMaterial().name().toLowerCase(Locale.ROOT) + "§f. Reste sous ton bloc pour te fondre dans le décor.");
     }
 
-    /** Sélectionne un emplacement vide de la barre d'objets pour ne rien afficher dans la main du joueur déguisé. */
     private void hideHeldItem(Player player) {
         for (int slot = 0; slot < 9; slot++) {
             ItemStack item = player.getInventory().getItem(slot);
@@ -640,7 +636,6 @@ public class PropHuntManager implements MiniGame {
                 Math.floor(loc.getX()), Math.floor(loc.getY()), Math.floor(loc.getZ()));
     }
 
-    /** Envoie un message dans l'action bar en interprétant les codes couleur legacy (§). */
     private void actionBar(Player player, String legacy) {
         player.sendActionBar(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
                 .legacySection().deserialize(legacy));

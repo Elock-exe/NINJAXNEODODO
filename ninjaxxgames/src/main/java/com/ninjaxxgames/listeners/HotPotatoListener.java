@@ -30,7 +30,6 @@ public class HotPotatoListener implements Listener {
 
         if (plugin.getEventManager().get(HotPotatoManager.ID) instanceof HotPotatoManager hotPotato) {
             if (hotPotato.isActiveParticipant(victim)) {
-                // Pas de dégâts / pas de perte de vie : on ne garde que le transfert + le wind burst.
                 event.setCancelled(true);
             }
             hotPotato.handleHit(attacker, victim);

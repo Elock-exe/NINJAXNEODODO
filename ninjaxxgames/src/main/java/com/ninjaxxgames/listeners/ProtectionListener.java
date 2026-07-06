@@ -2,6 +2,7 @@ package com.ninjaxxgames.listeners;
 
 import com.ninjaxxgames.NinjaxxGames;
 import com.ninjaxxgames.games.disaster.DisasterManager;
+import com.ninjaxxgames.managers.InterludeManager;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -9,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
@@ -55,6 +57,19 @@ public class ProtectionListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         String game = plugin.getSessionManager().getCurrentGame(player.getUniqueId());
         if (DisasterManager.ID.equals(game)) return;
+
+        InterludeManager interlude = plugin.getInterludeManager();
+        if (interlude != null && interlude.isParticipant(player.getUniqueId())
+                && event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Player attacker
+                && interlude.isParticipant(attacker.getUniqueId())) {
+            if (player.getHealth() - event.getFinalDamage() <= 0.0) {
+                event.setCancelled(true);
+                interlude.handleFatalHit(player, attacker);
+            }
+            return;
+        }
+
         event.setCancelled(true);
         if (event.getCause() == EntityDamageEvent.DamageCause.VOID && plugin.getZoneManager().hasHub()) {
             player.teleport(plugin.getZoneManager().getHub());
@@ -64,7 +79,6 @@ public class ProtectionListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        // En dehors d'un mini-jeu (donc au hub), on ne ramasse aucun item/bloc au sol.
         if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) == null) {
             event.setCancelled(true);
         }
@@ -88,8 +102,6 @@ public class ProtectionListener implements Listener {
         if (player.hasPermission("ninjaxxgames.admin")) {
             return false;
         }
-        // Les survivants du Disaster peuvent utiliser leurs objets de ravitaillement
-        // (eau, bloc de slime) dans l'arène — elle est régénérée en fin de partie.
         if (plugin.getEventManager().get(DisasterManager.ID) instanceof DisasterManager disaster
                 && disaster.isActive(player.getUniqueId()) && disaster.isInArena(loc)) {
             return false;

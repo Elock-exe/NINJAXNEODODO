@@ -21,11 +21,15 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.Sound;
+import org.bukkit.block.BlockFace;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Vector;
 
 public class DisasterListener implements Listener {
 
@@ -53,10 +57,25 @@ public class DisasterListener implements Listener {
     }
 
     @EventHandler
+    public void onSlimeJump(PlayerMoveEvent event) {
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
+        Player player = event.getPlayer();
+        if (!player.isOnGround()) return;
+        if (player.getLocation().getBlock().getRelative(BlockFace.DOWN).getType() != Material.SLIME_BLOCK) return;
+
+        double strength = plugin.getConfig().getDouble("disaster.supply.slime-jump-strength", 1.1);
+        Vector velocity = player.getVelocity();
+        velocity.setY(strength);
+        player.setFallDistance(0f);
+        player.setVelocity(velocity);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1f, 0.8f);
+    }
+
+    @EventHandler
     public void onToggleFlight(PlayerToggleFlightEvent event) {
         DisasterManager manager = manager();
         if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
-        // On garde allowFlight (évite le kick "Flying is not enabled"), mais on empêche le vol réel.
         event.setCancelled(true);
         event.getPlayer().setFlying(false);
     }
@@ -77,6 +96,19 @@ public class DisasterListener implements Listener {
         manager.handleAnvilLand(event);
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onZombieDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Zombie zombie)) return;
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isRunning()) return;
+        if (!manager.isDisasterZombie(zombie.getUniqueId())) return;
+        switch (event.getCause()) {
+            case ENTITY_EXPLOSION, BLOCK_EXPLOSION, LIGHTNING, FIRE, FIRE_TICK, FALLING_BLOCK ->
+                    event.setCancelled(true);
+            default -> { }
+        }
+    }
+
     @EventHandler
     public void onZombieDeath(EntityDeathEvent event) {
         if (!(event.getEntity() instanceof Zombie zombie)) return;
@@ -88,7 +120,6 @@ public class DisasterListener implements Listener {
         }
     }
 
-    // Le seau d'eau du ravitaillement est à usage unique : pas de seau vide rendu.
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
         DisasterManager manager = manager();
@@ -119,7 +150,6 @@ public class DisasterListener implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         DisasterManager manager = manager();
         if (manager == null || !manager.isActive(player.getUniqueId())) return;
-        // Pendant le Disaster, on ne ramasse QUE les items de ravitaillement custom.
         if (!manager.isSupplyItem(event.getItem().getItemStack())) {
             event.setCancelled(true);
         }
@@ -141,9 +171,9 @@ public class DisasterListener implements Listener {
         DisasterManager manager = manager();
         if (manager == null || !manager.isActive(player.getUniqueId())) return;
 
-        // Pas de PvP entre joueurs pendant le Disaster (coups directs ou projectiles).
         if (event instanceof EntityDamageByEntityEvent byEntity
-                && plugin.getConfig().getBoolean("disaster.prevent-pvp", true)) {
+                && plugin.getConfig().getBoolean("disaster.prevent-pvp", true)
+                && !manager.isPurgeActive()) {
             Entity damager = byEntity.getDamager();
             boolean fromPlayer = damager instanceof Player
                     || (damager instanceof Projectile proj && proj.getShooter() instanceof Player);
@@ -153,7 +183,6 @@ public class DisasterListener implements Listener {
             }
         }
 
-        // Les météorites (TNT) font moins mal : on réduit les dégâts d'explosion.
         if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
                 || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
             double factor = plugin.getConfig().getDouble("disaster.meteor.damage-multiplier", 0.35);

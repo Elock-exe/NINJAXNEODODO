@@ -15,11 +15,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Musique de fond custom via NoteBlockAPI : joue des chansons Note Block Studio (.nbs) en boucle,
- * une piste au hub et une autre en jeu. Les fichiers .nbs se déposent dans le dossier
- * {@code plugins/NinjaxxGames/songs/}. Nécessite le plugin NoteBlockAPI installé sur le serveur.
- */
 public class BackgroundMusicManager {
 
     private final NinjaxxGames plugin;

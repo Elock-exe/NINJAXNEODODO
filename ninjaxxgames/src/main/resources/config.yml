@@ -92,6 +92,8 @@ disaster:
     - acidrain
     - anvilrain
     - zombies
+    # purge : le PvP (normalement coupé) est activé pendant cette vague
+    - purge
   dash:
     enabled: true
     strength: 1.4
@@ -121,28 +123,29 @@ disaster:
     strikes-per-wave: 2
     target-players: false
   acidrain:
-    # Dégâts par seconde sur les joueurs exposés au ciel (s'abriter protège)
-    damage-per-second: 1.0
-    # Nombre de particules de pluie verte par tick (plus élevé = pluie acide bien plus visible)
-    rain-particles: 40
+    # Dégâts infligés aux joueurs exposés au ciel (s'abriter sous un toit protège)
+    damage-amount: 1.0
+    # Intervalle entre deux dégâts, en secondes (1 dégât toutes les 2 secondes par défaut)
+    damage-interval-seconds: 2.0
     # Dissolution lente des blocs exposés : toutes les X ticks, quelques blocs fondent
     dissolve-interval-ticks: 30
     dissolve-per-cycle: 2
   anvilrain:
-    interval-ticks: 12
-    count-per-wave: 5
+    # Même fonctionnement que les météorites : spawn au-dessus de l'arène, impact détecté au sol
+    interval-ticks: 10
+    count-per-wave: 6
     # Dégâts par bloc de chute (une enclume qui tombe de haut fait très mal)
     damage-per-block: 4.0
     max-damage: 20
-    spawn-height: 25.0
-    # Vitesse de chute initiale des enclumes (plus élevé = tombe beaucoup plus vite)
-    fall-speed: 3.0
+    spawn-height: 22.0
+    # Vitesse de chute initiale (même valeur que les météorites TNT)
+    fall-speed: 1.6
     # Rayon de blocs cassés à l'impact (0 = aucun dégât aux constructions)
     break-radius: 1
   zombies:
-    spawn-interval-ticks: 80
-    per-spawn: 2
-    max-alive: 8
+    spawn-interval-ticks: 30
+    per-spawn: 4
+    max-alive: 18
   # Ravitaillements : objets spéciaux qui apparaissent aléatoirement dans l'arène
   # (seau d'eau à usage unique, potion de soin, bloc de slime, steak — tiré au hasard)
   supply:
@@ -151,9 +154,17 @@ disaster:
     max-on-ground: 12
     # Nombre d'items déposés à chaque cycle
     per-cycle: 3
+    # Force du saut quand on marche sur un bloc de slime posé (jump pad)
+    slime-jump-strength: 1.1
   points:
     participation: 10
     win-bonus: 100
+
+# Interlude PvP entre deux events (/ninjaxx interlude) : épée en bois pour tous,
+# points par kill ajoutés au leaderboard à la fin, aucun jeu ne peut être lancé pendant.
+interlude:
+  duration-seconds: 120
+  points-per-kill: 30
 
 # Musique de fond custom via NoteBlockAPI (chansons Note Block Studio .nbs).
 # Nécessite le plugin NoteBlockAPI installé sur le serveur.

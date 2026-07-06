@@ -33,6 +33,9 @@ public class PlayerJoinListener implements Listener {
             }
             giveSteak(player);
             applySaturation(player);
+            if (plugin.getInterludeManager() != null) {
+                plugin.getInterludeManager().sanitize(player);
+            }
             if (plugin.getHubScoreboardManager() != null) {
                 plugin.getHubScoreboardManager().show(player);
             }
@@ -50,15 +53,13 @@ public class PlayerJoinListener implements Listener {
     @EventHandler
     public void onRegen(EntityRegainHealthEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        // La saturation permanente déclenche une régen ultra-rapide (SATIATED).
         if (event.getRegainReason() != EntityRegainHealthEvent.RegainReason.SATIATED
                 && event.getRegainReason() != EntityRegainHealthEvent.RegainReason.REGEN) {
             return;
         }
         String game = plugin.getSessionManager().getCurrentGame(player.getUniqueId());
-        if (game == null) return; // Au hub : régen normale.
+        if (game == null) return;
 
-        // Disaster : on garde une régen très réduite pour que les catastrophes comptent vraiment.
         if (DisasterManager.ID.equals(game)) {
             double mult = plugin.getConfig().getDouble("disaster.health-regen-multiplier", 0.2);
             if (mult <= 0.0) {
@@ -69,14 +70,12 @@ public class PlayerJoinListener implements Listener {
             return;
         }
 
-        // Autres mini-jeux : pas de régen naturelle, les dégâts comptent.
         event.setCancelled(true);
     }
 
     @EventHandler
     public void onHunger(FoodLevelChangeEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
-        // Saturation partout : personne n'a faim, la barre de nourriture reste pleine.
         if (event.getFoodLevel() < 20) {
             event.setFoodLevel(20);
         }
@@ -99,7 +98,6 @@ public class PlayerJoinListener implements Listener {
         }
     }
 
-    /** Saturation permanente : plus personne n'a faim, partout. */
     public static void applySaturation(Player player) {
         player.setFoodLevel(20);
         player.setSaturation(20f);
