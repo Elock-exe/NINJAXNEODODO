@@ -16,7 +16,12 @@ import com.ninjaxxgames.listeners.PlayerMoveListener;
 import com.ninjaxxgames.listeners.ProtectionListener;
 import com.ninjaxxgames.listeners.SelectionListener;
 import com.ninjaxxgames.managers.*;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 public final class NinjaxxGames extends JavaPlugin {
 
@@ -76,6 +81,14 @@ public final class NinjaxxGames extends JavaPlugin {
         this.backgroundMusicManager = new BackgroundMusicManager(this);
         backgroundMusicManager.start();
 
+        // Saturation permanente partout : personne n'a jamais faim.
+        getServer().getScheduler().runTaskTimer(this, () -> {
+            for (var player : getServer().getOnlinePlayers()) {
+                player.addPotionEffect(new PotionEffect(
+                        PotionEffectType.SATURATION, 400, 0, false, false, false));
+            }
+        }, 100L, 100L);
+
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new NinjaxxExpansion(this).register();
             getLogger().info("Hook PlaceholderAPI enregistré (placeholders %ninjaxx_...%).");
@@ -117,4 +130,24 @@ public final class NinjaxxGames extends JavaPlugin {
     public BackgroundMusicManager getBackgroundMusicManager() { return backgroundMusicManager; }
     public FormationManager getFormationManager() { return formationManager; }
     public PodiumManager getPodiumManager() { return podiumManager; }
+
+    /**
+     * Renvoie un joueur au hub : fin de session, inventaire vidé, téléportation,
+     * puis remise en état "hub" (steak + saturation + scoreboard).
+     */
+    public void sendToHub(Player player) {
+        sessionManager.clear(player.getUniqueId());
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        if (zoneManager.hasHub()) {
+            player.teleport(zoneManager.getHub());
+        }
+        if (!player.getInventory().contains(Material.COOKED_BEEF)) {
+            player.getInventory().addItem(new ItemStack(Material.COOKED_BEEF, 64));
+        }
+        PlayerJoinListener.applySaturation(player);
+        if (hubScoreboardManager != null) {
+            hubScoreboardManager.show(player);
+        }
+    }
 }

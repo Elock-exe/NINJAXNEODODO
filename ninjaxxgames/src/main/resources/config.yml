@@ -19,11 +19,16 @@ zones: {}
 
 squidgame:
   round-duration-seconds: 120
-  red-light-min-seconds: 3
-  red-light-max-seconds: 6
-  green-light-min-seconds: 4
-  green-light-max-seconds: 7
-  red-light-warning-seconds: 1.5
+  # Feux plus faciles : rouge plus court, vert plus long, gros avertissement avant le rouge.
+  red-light-min-seconds: 2
+  red-light-max-seconds: 4
+  green-light-min-seconds: 6
+  green-light-max-seconds: 10
+  red-light-warning-seconds: 2.5
+  # Délai de grâce (secondes) après le passage au ROUGE : on ne peut pas être éliminé pendant ce temps (réaction).
+  red-light-grace-seconds: 0.8
+  # Distance de mouvement tolérée pendant le ROUGE avant élimination (plus haut = plus indulgent).
+  move-threshold: 0.25
   points:
     participation: 10
     win-bonus: 100
@@ -31,6 +36,10 @@ squidgame:
 crowngame:
   round-duration-seconds: 180
   crown-ratio: 0.5
+  # Événements de chaos aléatoires (basse gravité, rapidité, super saut, rafale de vent)
+  events-enabled: true
+  event-interval-seconds: 25
+  event-duration-seconds: 8
   points:
     participation: 10
     win-bonus: 100
@@ -39,6 +48,8 @@ hotpotato:
   players-per-potato: 8
   min-timer-seconds: 15
   max-timer-seconds: 40
+  # Dernières secondes où un compte à rebours "ding-dong" se joue au porteur de la patate
+  warning-seconds: 10
   # Coup = effet "wind burst" (envoi en l'air), sans dégâts
   windburst-strength: 0.9
   windburst-lift: 0.55
@@ -63,6 +74,12 @@ prophunt:
 disaster:
   round-duration-seconds: 45
   intermission-seconds: 5
+  # Empêche les joueurs de se taper entre eux (coups + projectiles) pendant la partie
+  prevent-pvp: true
+  # Empêche les joueurs de casser des blocks pendant la partie
+  prevent-block-break: true
+  # Multiplicateur de régénération de vie pendant le Disaster (0 = aucune régen, 1 = normale)
+  health-regen-multiplier: 0.2
   regen-after-game: true
   max-regen-blocks: 2000000
   # Régénération progressive : nombre de blocs restaurés par tick (plus bas = plus lent, moins de lag)
@@ -89,6 +106,8 @@ disaster:
     set-fire: true
     # Multiplicateur des dégâts d'explosion sur les joueurs (1.0 = normal, plus bas = font moins mal)
     damage-multiplier: 0.35
+    # Dégâts MAX qu'une seule météorite peut infliger (6.0 = 3 cœurs). Empêche le one-shot. 0 = pas de plafond.
+    max-damage: 6.0
   tornado:
     radius: 7.0
     pull-strength: 0.6
@@ -104,16 +123,20 @@ disaster:
   acidrain:
     # Dégâts par seconde sur les joueurs exposés au ciel (s'abriter protège)
     damage-per-second: 1.0
+    # Nombre de particules de pluie verte par tick (plus élevé = pluie acide bien plus visible)
+    rain-particles: 40
     # Dissolution lente des blocs exposés : toutes les X ticks, quelques blocs fondent
     dissolve-interval-ticks: 30
     dissolve-per-cycle: 2
   anvilrain:
-    interval-ticks: 18
-    count-per-wave: 2
+    interval-ticks: 12
+    count-per-wave: 5
     # Dégâts par bloc de chute (une enclume qui tombe de haut fait très mal)
     damage-per-block: 4.0
     max-damage: 20
     spawn-height: 25.0
+    # Vitesse de chute initiale des enclumes (plus élevé = tombe beaucoup plus vite)
+    fall-speed: 3.0
     # Rayon de blocs cassés à l'impact (0 = aucun dégât aux constructions)
     break-radius: 1
   zombies:
@@ -124,8 +147,10 @@ disaster:
   # (seau d'eau à usage unique, potion de soin, bloc de slime, steak — tiré au hasard)
   supply:
     enabled: true
-    interval-seconds: 12
-    max-on-ground: 6
+    interval-seconds: 5
+    max-on-ground: 12
+    # Nombre d'items déposés à chaque cycle
+    per-cycle: 3
   points:
     participation: 10
     win-bonus: 100

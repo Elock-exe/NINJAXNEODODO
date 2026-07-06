@@ -3,19 +3,24 @@ package com.ninjaxxgames.listeners;
 import com.ninjaxxgames.NinjaxxGames;
 import com.ninjaxxgames.games.disaster.DisasterManager;
 import org.bukkit.Material;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
@@ -110,11 +115,43 @@ public class DisasterListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(player.getUniqueId())) return;
+        // Pendant le Disaster, on ne ramasse QUE les items de ravitaillement custom.
+        if (!manager.isSupplyItem(event.getItem().getItemStack())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
+        if (plugin.getConfig().getBoolean("disaster.prevent-block-break", true)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
 
         DisasterManager manager = manager();
         if (manager == null || !manager.isActive(player.getUniqueId())) return;
+
+        // Pas de PvP entre joueurs pendant le Disaster (coups directs ou projectiles).
+        if (event instanceof EntityDamageByEntityEvent byEntity
+                && plugin.getConfig().getBoolean("disaster.prevent-pvp", true)) {
+            Entity damager = byEntity.getDamager();
+            boolean fromPlayer = damager instanceof Player
+                    || (damager instanceof Projectile proj && proj.getShooter() instanceof Player);
+            if (fromPlayer) {
+                event.setCancelled(true);
+                return;
+            }
+        }
 
         // Les météorites (TNT) font moins mal : on réduit les dégâts d'explosion.
         if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION

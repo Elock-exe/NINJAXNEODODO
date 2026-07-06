@@ -5,10 +5,15 @@ import com.ninjaxxgames.games.GlowSidebar;
 import com.ninjaxxgames.games.MiniGame;
 import com.ninjaxxgames.managers.PlayerSessionManager;
 import com.ninjaxxgames.models.Zone;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -17,6 +22,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.util.*;
 
@@ -44,6 +50,8 @@ public class CrownGameManager implements MiniGame {
     private BukkitTask tickTask;
     private int remainingSeconds;
     private int currentRound;
+    private int nextEventIn;
+    private final Random random = new Random();
 
     public CrownGameManager(NinjaxxGames plugin) {
         this.plugin = plugin;
@@ -167,10 +175,67 @@ public class CrownGameManager implements MiniGame {
         for (UUID holder : crownHolders) {
             crownTime.merge(holder, 1, Integer::sum);
         }
+
+        // Événement de chaos périodique : pimente la manche avec un effet surprise.
+        if (--nextEventIn <= 0) {
+            triggerChaosEvent();
+            nextEventIn = plugin.getConfig().getInt("crowngame.event-interval-seconds", 25);
+        }
+
         remainingSeconds--;
         updateScoreboards();
         if (remainingSeconds <= 0) {
             endRound();
+        }
+    }
+
+    /** Événement aléatoire appliqué à tous les joueurs actifs pour dynamiser la manche. */
+    private void triggerChaosEvent() {
+        if (!plugin.getConfig().getBoolean("crowngame.events-enabled", true)) return;
+        if (activePlayers.size() < 2) return;
+
+        int duration = plugin.getConfig().getInt("crowngame.event-duration-seconds", 8) * 20;
+        switch (random.nextInt(4)) {
+            case 0 -> chaosEffect("§b§l☁ BASSE GRAVITÉ !", "§7Tout le monde flotte...",
+                    Sound.ENTITY_PHANTOM_FLAP, duration,
+                    new PotionEffect(PotionEffectType.SLOW_FALLING, duration, 0, false, false),
+                    new PotionEffect(PotionEffectType.JUMP_BOOST, duration, 2, false, false));
+            case 1 -> chaosEffect("§e§l⚡ RAPIDITÉ !", "§7Attrapez la couronne, vite !",
+                    Sound.ENTITY_EXPERIENCE_ORB_PICKUP, duration,
+                    new PotionEffect(PotionEffectType.SPEED, duration, 1, false, false));
+            case 2 -> chaosEffect("§a§l🦘 SUPER SAUT !", "§7Bondissez partout !",
+                    Sound.ENTITY_RABBIT_JUMP, duration,
+                    new PotionEffect(PotionEffectType.JUMP_BOOST, duration, 4, false, false));
+            default -> chaosWindGust();
+        }
+    }
+
+    private Component legacy(String legacy) {
+        return LegacyComponentSerializer.legacySection().deserialize(legacy);
+    }
+
+    private void chaosEffect(String title, String subtitle, Sound sound, int duration, PotionEffect... effects) {
+        for (UUID uuid : activePlayers) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p == null) continue;
+            for (PotionEffect e : effects) p.addPotionEffect(e);
+            p.showTitle(Title.title(legacy(title), legacy(subtitle)));
+            p.playSound(p.getLocation(), sound, 1.2f, 1.0f);
+        }
+        broadcast("§6[Crown Game] " + title + " §f— " + subtitle);
+    }
+
+    /** Rafale de vent globale : tout le monde est projeté vers le haut, la couronne peut changer de main. */
+    private void chaosWindGust() {
+        broadcast("§6[Crown Game] §f§l💨 RAFALE DE VENT ! §7— tenez-vous prêts !");
+        for (UUID uuid : activePlayers) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p == null) continue;
+            World world = p.getWorld();
+            world.spawnParticle(Particle.GUST, p.getLocation().add(0, 1, 0), 15, 0.8, 0.5, 0.8, 0.1);
+            world.playSound(p.getLocation(), Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.3f, 1.0f);
+            Vector push = new Vector((random.nextDouble() - 0.5) * 1.2, 0.8, (random.nextDouble() - 0.5) * 1.2);
+            p.setVelocity(p.getVelocity().add(push));
         }
     }
 
@@ -199,6 +264,7 @@ public class CrownGameManager implements MiniGame {
         }
 
         remainingSeconds = plugin.getConfig().getInt("crowngame.round-duration-seconds", 180);
+        nextEventIn = plugin.getConfig().getInt("crowngame.event-interval-seconds", 25);
         broadcast("§6[Crown Game] §fManche §e" + currentRound + " §f— §e" + total
                 + " §fjoueurs, §e" + crownCount + " §fcouronne(s). Garde la couronne pour survivre !");
         updateScoreboards();
@@ -376,6 +442,7 @@ public class CrownGameManager implements MiniGame {
         if (crownHolders.contains(attackerId)) return;
 
         clearCrownVisuals(victim);
+        windBurstHit(attacker, victim);
         giveCrown(attackerId);
         updateScoreboards();
 
@@ -390,7 +457,52 @@ public class CrownGameManager implements MiniGame {
 
         p.getInventory().setHelmet(createCrownItem());
         p.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, Integer.MAX_VALUE, 0, false, false));
+        windBurst(p);
         p.sendMessage("§6👑 [Crown Game] §fTu as la couronne ! §7Garde-la pour survivre à la manche.");
+    }
+
+    /** Rafale de vent qui projette le porteur touché au moment où on lui prend la couronne (façon enchantement Rafale de la masse). */
+    private void windBurstHit(Player attacker, Player victim) {
+        World world = victim.getWorld();
+        Location center = victim.getLocation();
+
+        world.playSound(center, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.6f, 0.8f);
+        world.playSound(center, Sound.ITEM_MACE_SMASH_GROUND, 1.2f, 1.0f);
+        world.spawnParticle(Particle.GUST_EMITTER_LARGE, center.clone().add(0, 1, 0), 1, 0, 0, 0, 0);
+        world.spawnParticle(Particle.GUST, center.clone().add(0, 1, 0), 25, 1.4, 1.0, 1.4, 0.1);
+
+        // Projette la victime loin de l'attaquant, avec une forte poussée verticale.
+        Vector push = victim.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (push.lengthSquared() < 0.0001) push = new Vector(0, 1, 0);
+        push.normalize().multiply(1.4);
+        push.setY(0.9);
+        victim.setVelocity(victim.getVelocity().add(push));
+    }
+
+    /** Effet de rafale de vent (wind burst) au moment où l'on récupère la couronne. */
+    private void windBurst(Player p) {
+        World world = p.getWorld();
+        Location center = p.getLocation();
+
+        world.playSound(center, Sound.ENTITY_WIND_CHARGE_WIND_BURST, 1.4f, 0.9f);
+        world.playSound(center, Sound.ITEM_MACE_SMASH_AIR, 1.2f, 1.0f);
+        world.spawnParticle(Particle.GUST_EMITTER_LARGE, center.clone().add(0, 1, 0), 1, 0, 0, 0, 0);
+        world.spawnParticle(Particle.GUST, center.clone().add(0, 1, 0), 20, 1.2, 0.8, 1.2, 0.1);
+
+        // Repousse les joueurs proches, comme une véritable rafale.
+        double radius = 4.0;
+        for (UUID uuid : activePlayers) {
+            if (uuid.equals(p.getUniqueId())) continue;
+            Player other = plugin.getServer().getPlayer(uuid);
+            if (other == null || other.getWorld() != world) continue;
+            double dist = other.getLocation().distance(center);
+            if (dist > radius) continue;
+            Vector push = other.getLocation().toVector().subtract(center.toVector());
+            if (push.lengthSquared() < 0.0001) push = new Vector(0, 1, 0);
+            push.normalize().multiply(1.2 * (1.0 - dist / radius));
+            push.setY(0.5);
+            other.setVelocity(other.getVelocity().add(push));
+        }
     }
 
     private void clearCrownVisuals(Player p) {
@@ -420,6 +532,11 @@ public class CrownGameManager implements MiniGame {
     private boolean isCrownItem(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
         return meta != null && meta.hasDisplayName() && CROWN_ITEM_NAME.equals(meta.getDisplayName());
+    }
+
+    /** Utilisé par le listener pour empêcher de retirer la couronne du casque. */
+    public boolean isCrown(ItemStack item) {
+        return item != null && item.getType() == Material.GOLDEN_HELMET && isCrownItem(item);
     }
 
     private void broadcastIntro() {
@@ -529,10 +646,7 @@ public class CrownGameManager implements MiniGame {
     }
 
     private void sendToHub(Player player) {
-        plugin.getSessionManager().clear(player.getUniqueId());
-        if (plugin.getZoneManager().hasHub()) {
-            player.teleport(plugin.getZoneManager().getHub());
-        }
+        plugin.sendToHub(player);
     }
 
     private void broadcast(String message) {

@@ -14,6 +14,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
@@ -71,12 +72,27 @@ public class DisasterManager implements MiniGame {
     private int secondsLeft;
 
     private final List<Vortex> vortices = new ArrayList<>();
-    private final Set<FallingBlock> tornadoDebris = new HashSet<>();
+    private final List<Debris> tornadoDebris = new ArrayList<>();
 
     private static final class Vortex {
         Location center;
         Location target;
         Vortex(Location center) { this.center = center; }
+    }
+
+    /** Un bloc décoratif (BlockDisplay) emporté par la tornade. */
+    private static final class Debris {
+        final BlockDisplay display;
+        double angle;
+        double radius;
+        double height;
+        int age;
+        Debris(BlockDisplay display, double angle, double radius, double height) {
+            this.display = display;
+            this.angle = angle;
+            this.radius = radius;
+            this.height = height;
+        }
     }
 
     public DisasterManager(NinjaxxGames plugin) {
@@ -416,34 +432,40 @@ public class DisasterManager implements MiniGame {
         meteorEntities.clear();
     }
 
-    /** Les tornades aspirent des blocs du sol (visuel, sans casser la map) et les font tournoyer avec elles. */
+    /** Les tornades arrachent des blocs du sol (BlockDisplay décoratifs) et les emportent en tournoyant. */
     private void updateTornadoDebris(World world, Zone arena) {
-        if (vortices.isEmpty()) return;
+        if (vortices.isEmpty()) {
+            clearTornadoDebris();
+            return;
+        }
 
-        // Faire tourbillonner les débris existants autour de la tornade la plus proche.
-        Iterator<FallingBlock> it = tornadoDebris.iterator();
+        double baseY = arena.getMinY();
+        double maxHeight = Math.max(7.0, arena.getMaxY() - arena.getMinY() + 4);
+        int lifetime = 160;
+
+        // Déplacer/faire tournoyer les débris existants autour de la tornade la plus proche.
+        Iterator<Debris> it = tornadoDebris.iterator();
         while (it.hasNext()) {
-            FallingBlock fb = it.next();
-            if (fb == null || fb.isDead() || !fb.isValid() || fb.getTicksLived() > 45) {
-                if (fb != null) fb.remove();
+            Debris d = it.next();
+            if (d.display == null || d.display.isDead() || !d.display.isValid() || d.age++ > lifetime) {
+                if (d.display != null && !d.display.isDead()) d.display.remove();
                 it.remove();
                 continue;
             }
-            Vortex v = nearestVortex(fb.getLocation());
+            Vortex v = nearestVortex(d.display.getLocation());
             if (v == null) continue;
-            double dx = v.center.getX() - fb.getLocation().getX();
-            double dz = v.center.getZ() - fb.getLocation().getZ();
-            Vector toCenter = new Vector(dx, 0, dz);
-            if (toCenter.lengthSquared() > 0) toCenter.normalize();
-            Vector swirl = new Vector(-toCenter.getZ(), 0, toCenter.getX());
-            Vector vel = toCenter.multiply(0.25).add(swirl.multiply(0.5));
-            vel.setY(0.28);
-            fb.setVelocity(vel);
+            d.angle += 0.3;                                  // vitesse de rotation
+            d.height = Math.min(maxHeight, d.height + 0.18); // monte le long de l'entonnoir
+            d.radius = 1.0 + (d.height / maxHeight) * 3.0;   // entonnoir : plus large en haut
+            double px = v.center.getX() + Math.cos(d.angle) * d.radius - 0.5;
+            double pz = v.center.getZ() + Math.sin(d.angle) * d.radius - 0.5;
+            // La tornade se déplace → les blocs la suivent car ils visent toujours son centre actuel.
+            d.display.teleport(new Location(world, px, baseY + d.height, pz));
         }
 
-        // En aspirer de nouveaux autour de chaque tornade, façon terre arrachée au sol.
-        int maxTotal = 12 * vortices.size();
-        if (tornadoDebris.size() < maxTotal && tickCounter % 6 == 0) {
+        // En arracher de nouveaux autour de chaque tornade.
+        int maxTotal = 18 * vortices.size();
+        if (tornadoDebris.size() < maxTotal && tickCounter % 4 == 0) {
             for (Vortex v : vortices) {
                 Material ground = world.getBlockAt(v.center.getBlockX(),
                         (int) Math.floor(arena.getMinY()), v.center.getBlockZ()).getType();
@@ -451,26 +473,24 @@ public class DisasterManager implements MiniGame {
                     ground = Material.DIRT;
                 }
                 for (int k = 0; k < 2; k++) {
-                    double ang = random.nextDouble() * Math.PI * 2;
-                    double r = random.nextDouble() * 2.0;
-                    double x = v.center.getX() + Math.cos(ang) * r;
-                    double z = v.center.getZ() + Math.sin(ang) * r;
-                    Location loc = new Location(world, x, arena.getMinY() + 0.5, z);
-                    FallingBlock fb = world.spawnFallingBlock(loc, ground.createBlockData());
-                    fb.setDropItem(false);
-                    fb.setHurtEntities(false);
-                    fb.setCancelDrop(true);
-                    fb.setPersistent(false);
-                    fb.setVelocity(new Vector(0, 0.6, 0));
-                    tornadoDebris.add(fb);
+                    double angle = random.nextDouble() * Math.PI * 2;
+                    double radius = 1.0 + random.nextDouble() * 1.5;
+                    double startH = random.nextDouble() * 2.0;
+                    double px = v.center.getX() + Math.cos(angle) * radius - 0.5;
+                    double pz = v.center.getZ() + Math.sin(angle) * radius - 0.5;
+                    Location loc = new Location(world, px, baseY + startH, pz);
+                    BlockDisplay display = world.spawn(loc, BlockDisplay.class);
+                    display.setBlock(ground.createBlockData());
+                    display.setPersistent(false);
+                    tornadoDebris.add(new Debris(display, angle, radius, startH));
                 }
             }
         }
     }
 
     private void clearTornadoDebris() {
-        for (FallingBlock fb : tornadoDebris) {
-            if (fb != null && !fb.isDead()) fb.remove();
+        for (Debris d : tornadoDebris) {
+            if (d.display != null && !d.display.isDead()) d.display.remove();
         }
         tornadoDebris.clear();
     }
@@ -505,21 +525,26 @@ public class DisasterManager implements MiniGame {
             v.center.setX(clamp(v.center.getX(), arena.getMinX(), arena.getMaxX()));
             v.center.setZ(clamp(v.center.getZ(), arena.getMinZ(), arena.getMaxZ()));
 
-            for (double h = 0; h < height; h += 0.5) {
-                double r = 0.8 + h * 0.18;
-                for (int k = 0; k < 3; k++) {
-                    double ang = tickCounter * 0.5 + h * 0.8 + (Math.PI * 2.0 / 3.0) * k;
+            // Tornade géante : entonnoir large, dense et très haut, visible de loin.
+            double funnelHeight = height * 2.0;
+            for (double h = 0; h < funnelHeight; h += 0.3) {
+                double r = 2.0 + h * 0.35;
+                for (int k = 0; k < 6; k++) {
+                    double ang = tickCounter * 0.5 + h * 0.6 + (Math.PI * 2.0 / 6.0) * k;
                     double px = v.center.getX() + Math.cos(ang) * r;
                     double pz = v.center.getZ() + Math.sin(ang) * r;
                     Location pLoc = new Location(world, px, baseY + h, pz);
-                    world.spawnParticle(Particle.CLOUD, pLoc, 1, 0.02, 0.02, 0.02, 0.0);
-                    if (((int) (h * 2)) % 3 == 0) {
-                        world.spawnParticle(Particle.LARGE_SMOKE, pLoc, 1, 0.0, 0.0, 0.0, 0.0);
-                    }
+                    world.spawnParticle(Particle.CLOUD, pLoc, 2, 0.2, 0.2, 0.2, 0.0);
+                    world.spawnParticle(Particle.LARGE_SMOKE, pLoc, 1, 0.15, 0.15, 0.15, 0.0);
                 }
             }
+            // Colonne centrale sombre pour bien la repérer de loin.
+            for (double h = 0; h < funnelHeight; h += 0.8) {
+                Location core = new Location(world, v.center.getX(), baseY + h, v.center.getZ());
+                world.spawnParticle(Particle.LARGE_SMOKE, core, 3, 0.4, 0.2, 0.4, 0.02);
+            }
             if (tickCounter % 20 == 0) {
-                world.playSound(v.center, Sound.ENTITY_PHANTOM_FLAP, 1.4f, 0.4f);
+                world.playSound(v.center, Sound.ENTITY_PHANTOM_FLAP, 2.0f, 0.4f);
             }
         }
 
@@ -552,6 +577,10 @@ public class DisasterManager implements MiniGame {
             Vector velocity = toCenter.multiply(pull * factor)
                     .add(swirl.multiply(pull * factor));
             velocity.setY(lift * factor);
+            // On (re)garantit allowFlight juste avant de soulever, sinon le serveur kick "Flying is not enabled".
+            p.setAllowFlight(true);
+            p.setFlying(false);
+            p.setFallDistance(0f);
             p.setVelocity(p.getVelocity().multiply(0.3).add(velocity));
 
             p.damage(dmgPerSecond * 3.0 / 20.0);
@@ -609,6 +638,22 @@ public class DisasterManager implements MiniGame {
             world.setStorm(true);
             world.setWeatherDuration(20 * 600);
             acidWeatherActive = true;
+        }
+
+        // Pluie acide TRÈS visible : rideau de particules vertes qui tombent du ciel sur toute l'arène.
+        int drops = Math.max(10, plugin.getConfig().getInt("disaster.acidrain.rain-particles", 40));
+        Particle.DustOptions acid = new Particle.DustOptions(Color.LIME, 1.4f);
+        double topY = arena.getMaxY() + 3;
+        for (int i = 0; i < drops; i++) {
+            double rx = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
+            double rz = arena.getMinZ() + random.nextDouble() * (arena.getMaxZ() - arena.getMinZ());
+            double ry = arena.getMinY() + random.nextDouble() * (topY - arena.getMinY());
+            world.spawnParticle(Particle.DUST, new Location(world, rx, ry, rz), 1, 0.0, 0.0, 0.0, 0.0, acid);
+        }
+        if (tickCounter % 40 == 0) {
+            world.playSound(new Location(world,
+                    (arena.getMinX() + arena.getMaxX()) / 2, arena.getMaxY(),
+                    (arena.getMinZ() + arena.getMaxZ()) / 2), Sound.WEATHER_RAIN, 1.2f, 1.3f);
         }
 
         // Dégâts sur les joueurs exposés au ciel : s'abriter sous un toit protège.
@@ -674,6 +719,7 @@ public class DisasterManager implements MiniGame {
         float damagePerBlock = (float) plugin.getConfig().getDouble("disaster.anvilrain.damage-per-block", 4.0);
         int maxDamage = plugin.getConfig().getInt("disaster.anvilrain.max-damage", 20);
         double spawnHeight = plugin.getConfig().getDouble("disaster.anvilrain.spawn-height", 25.0);
+        double fallSpeed = plugin.getConfig().getDouble("disaster.anvilrain.fall-speed", 2.5);
 
         for (int i = 0; i < count; i++) {
             double x = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
@@ -681,6 +727,8 @@ public class DisasterManager implements MiniGame {
             Location loc = new Location(world, x, arena.getMaxY() + spawnHeight, z);
 
             FallingBlock anvil = world.spawnFallingBlock(loc, Material.ANVIL.createBlockData());
+            // Vitesse de chute initiale vers le bas : les enclumes tombent beaucoup plus vite.
+            anvil.setVelocity(new Vector(0, -fallSpeed, 0));
             anvil.setHurtEntities(true);
             anvil.setDamagePerBlock(damagePerBlock);
             anvil.setMaxDamage(maxDamage);
@@ -848,19 +896,22 @@ public class DisasterManager implements MiniGame {
             var e = plugin.getServer().getEntity(id);
             return e == null || !e.isValid();
         });
-        int maxOnGround = Math.max(1, plugin.getConfig().getInt("disaster.supply.max-on-ground", 6));
+        int maxOnGround = Math.max(1, plugin.getConfig().getInt("disaster.supply.max-on-ground", 12));
         if (supplyItems.size() >= maxOnGround) return;
 
-        Location loc = randomSurfacePoint(arena, world);
-        if (loc == null) return;
+        int perCycle = Math.max(1, plugin.getConfig().getInt("disaster.supply.per-cycle", 3));
+        for (int i = 0; i < perCycle && supplyItems.size() < maxOnGround; i++) {
+            Location loc = randomSurfacePoint(arena, world);
+            if (loc == null) continue;
 
-        Item drop = world.dropItem(loc.clone().add(0, 0.5, 0), randomSupplyItem());
-        drop.setVelocity(new Vector(0, 0.15, 0));
-        drop.setGlowing(true);
-        supplyItems.add(drop.getUniqueId());
+            Item drop = world.dropItem(loc.clone().add(0, 0.5, 0), randomSupplyItem());
+            drop.setVelocity(new Vector(0, 0.15, 0));
+            drop.setGlowing(true);
+            supplyItems.add(drop.getUniqueId());
 
-        world.spawnParticle(Particle.FIREWORK, loc, 20, 0.3, 0.4, 0.3, 0.05);
-        world.playSound(loc, Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, 1.4f);
+            world.spawnParticle(Particle.FIREWORK, loc, 20, 0.3, 0.4, 0.3, 0.05);
+            world.playSound(loc, Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, 1.4f);
+        }
     }
 
     private ItemStack randomSupplyItem() {
@@ -902,7 +953,7 @@ public class DisasterManager implements MiniGame {
         return meta != null && meta.hasDisplayName() && SUPPLY_BUCKET_NAME.equals(meta.getDisplayName());
     }
 
-    private boolean isSupplyItem(ItemStack item) {
+    public boolean isSupplyItem(ItemStack item) {
         if (item == null) return false;
         ItemMeta meta = item.getItemMeta();
         if (meta == null || !meta.hasDisplayName()) return false;
@@ -1335,10 +1386,7 @@ public class DisasterManager implements MiniGame {
     }
 
     private void sendToHub(Player player) {
-        plugin.getSessionManager().clear(player.getUniqueId());
-        if (plugin.getZoneManager().hasHub()) {
-            player.teleport(plugin.getZoneManager().getHub());
-        }
+        plugin.sendToHub(player);
     }
 
     private void broadcast(String message) {

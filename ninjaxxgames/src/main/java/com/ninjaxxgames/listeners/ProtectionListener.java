@@ -10,6 +10,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 
@@ -57,6 +58,15 @@ public class ProtectionListener implements Listener {
         event.setCancelled(true);
         if (event.getCause() == EntityDamageEvent.DamageCause.VOID && plugin.getZoneManager().hasHub()) {
             player.teleport(plugin.getZoneManager().getHub());
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        // En dehors d'un mini-jeu (donc au hub), on ne ramasse aucun item/bloc au sol.
+        if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) == null) {
+            event.setCancelled(true);
         }
     }
 
