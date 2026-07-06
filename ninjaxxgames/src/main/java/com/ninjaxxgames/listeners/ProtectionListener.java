@@ -78,6 +78,12 @@ public class ProtectionListener implements Listener {
         if (player.hasPermission("ninjaxxgames.admin")) {
             return false;
         }
+        // Les survivants du Disaster peuvent utiliser leurs objets de ravitaillement
+        // (eau, bloc de slime) dans l'arène — elle est régénérée en fin de partie.
+        if (plugin.getEventManager().get(DisasterManager.ID) instanceof DisasterManager disaster
+                && disaster.isActive(player.getUniqueId()) && disaster.isInArena(loc)) {
+            return false;
+        }
         if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) != null) {
             return true;
         }
