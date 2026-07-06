@@ -12,12 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Place tous les autres joueurs connectés en grille devant un "leader" et les gèle sur place.
- * La commande fonctionne en bascule : une fois pour placer + geler, une deuxième fois pour libérer.
- * Le nombre de joueurs par rangée est calculé automatiquement (≈ racine carrée du nombre de joueurs)
- * ou forcé via un argument.
- */
 public class FormationManager {
 
     private static final double SIDE_SPACING = 2.0;
@@ -35,10 +29,6 @@ public class FormationManager {
         return frozen.containsKey(uuid);
     }
 
-    /**
-     * Verrouille la position d'un joueur gelé (le regard reste libre).
-     * @return true si le joueur est gelé (l'appelant peut arrêter le traitement du mouvement).
-     */
     public boolean handleMove(PlayerMoveEvent event) {
         Location locked = frozen.get(event.getPlayer().getUniqueId());
         if (locked == null) return false;
@@ -53,11 +43,6 @@ public class FormationManager {
         return true;
     }
 
-    /**
-     * Bascule : libère les joueurs s'ils sont déjà gelés, sinon les place en grille et les gèle.
-     * @param forcedPerRow nombre par rangée imposé, ou null pour un calcul automatique.
-     * @return message de statut à afficher au leader.
-     */
     public String toggle(Player leader, Integer forcedPerRow) {
         if (!frozen.isEmpty()) {
             int released = frozen.size();
@@ -87,7 +72,6 @@ public class FormationManager {
         forward.normalize();
         Vector right = new Vector(-forward.getZ(), 0, forward.getX());
 
-        // Les joueurs regardent vers le leader (sens opposé à son regard).
         float faceYaw = (float) (Math.toDegrees(Math.atan2(-forward.getX(), forward.getZ())) + 180.0);
 
         for (int i = 0; i < n; i++) {

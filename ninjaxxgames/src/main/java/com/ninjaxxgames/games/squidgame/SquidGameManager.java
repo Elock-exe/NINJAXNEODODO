@@ -246,7 +246,6 @@ public class SquidGameManager implements MiniGame {
             }
         }.runTaskTimer(plugin, 20L, 20L);
 
-        // Rappel permanent en bas de l'écran de l'état actuel (VERT/ROUGE) : la course est plus lisible.
         actionBarTask = new BukkitRunnable() {
             @Override
             public void run() {
@@ -266,7 +265,6 @@ public class SquidGameManager implements MiniGame {
         scheduleGreenLight();
     }
 
-    /** Texte permanent affiché en bas de l'écran selon l'état du feu (null si pas en course). */
     private Component currentLightActionBar() {
         return switch (phase) {
             case GREEN_LIGHT -> redIncoming
@@ -281,7 +279,6 @@ public class SquidGameManager implements MiniGame {
         if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.GREEN_LIGHT;
         redIncoming = false;
-        // Signal TRÈS clair : gros titre vert + son franc.
         broadcastTitle("§a§l🟢 VERT", "§a§lAVANCE !", 2, 24, 4);
         broadcastActionBar("§a§l➤ AVANCE ! ➤");
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1.6f, 2.0f);
@@ -310,7 +307,6 @@ public class SquidGameManager implements MiniGame {
     private void warnRedLight(long delayTicks) {
         if (phase == SquidGamePhase.FINISHED) return;
         redIncoming = true;
-        // Avertissement clair : le rouge arrive, prépare-toi à t'arrêter.
         broadcastActionBar("§e§l⚠ ATTENTION — le ROUGE arrive... prépare-toi à t'arrêter !");
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 1.2f, 0.8f);
         new BukkitRunnable() {
@@ -336,7 +332,6 @@ public class SquidGameManager implements MiniGame {
         phase = SquidGamePhase.RED_LIGHT;
         redIncoming = false;
         redLightStartMs = System.currentTimeMillis();
-        // Signal TRÈS clair : gros titre rouge + son fort et grave.
         broadcastTitle("§c§l🔴 ROUGE", "§c§lSTOP — NE BOUGE PLUS !", 0, 30, 4);
         broadcastActionBar("§c§l✋ STOP ! NE BOUGE PLUS ✋");
         broadcastSound(Sound.BLOCK_NOTE_BLOCK_BASS, 1.6f, 0.5f);
@@ -505,7 +500,6 @@ public class SquidGameManager implements MiniGame {
         }
 
         if (phase == SquidGamePhase.RED_LIGHT) {
-            // Délai de grâce après le passage au rouge : temps de réaction, pas d'élimination.
             double graceSeconds = plugin.getConfig().getDouble("squidgame.red-light-grace-seconds", 0.8);
             boolean inGrace = System.currentTimeMillis() - redLightStartMs < (long) (graceSeconds * 1000);
 
@@ -591,7 +585,6 @@ public class SquidGameManager implements MiniGame {
         }
     }
 
-    /** Gros titre au centre de l'écran (durées en ticks). */
     private void broadcastTitle(String title, String subtitle, int fadeInTicks, int stayTicks, int fadeOutTicks) {
         Title t = Title.title(
                 legacy(title),

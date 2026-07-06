@@ -64,7 +64,6 @@ public class ProtectionListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        // En dehors d'un mini-jeu (donc au hub), on ne ramasse aucun item/bloc au sol.
         if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) == null) {
             event.setCancelled(true);
         }
@@ -88,8 +87,6 @@ public class ProtectionListener implements Listener {
         if (player.hasPermission("ninjaxxgames.admin")) {
             return false;
         }
-        // Les survivants du Disaster peuvent utiliser leurs objets de ravitaillement
-        // (eau, bloc de slime) dans l'arène — elle est régénérée en fin de partie.
         if (plugin.getEventManager().get(DisasterManager.ID) instanceof DisasterManager disaster
                 && disaster.isActive(player.getUniqueId()) && disaster.isInArena(loc)) {
             return false;

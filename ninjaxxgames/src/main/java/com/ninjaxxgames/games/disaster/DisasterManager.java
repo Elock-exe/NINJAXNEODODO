@@ -85,7 +85,6 @@ public class DisasterManager implements MiniGame {
         Vortex(Location center) { this.center = center; }
     }
 
-    /** Un bloc décoratif (BlockDisplay) emporté par la tornade. */
     private static final class Debris {
         final BlockDisplay display;
         double angle;
@@ -228,7 +227,6 @@ public class DisasterManager implements MiniGame {
                 p.setGameMode(GameMode.SURVIVAL);
                 p.setHealth(maxHealth(p));
                 p.setFoodLevel(20);
-                // Evite le kick "Flying is not enabled" quand la tornade soulève le joueur.
                 p.setAllowFlight(true);
                 p.setFlying(false);
                 if (dashEnabled) {
@@ -433,7 +431,6 @@ public class DisasterManager implements MiniGame {
         meteorEntities.clear();
     }
 
-    /** Les tornades arrachent des blocs du sol (BlockDisplay décoratifs) et les emportent en tournoyant. */
     private void updateTornadoDebris(World world, Zone arena) {
         if (vortices.isEmpty()) {
             clearTornadoDebris();
@@ -444,7 +441,6 @@ public class DisasterManager implements MiniGame {
         double maxHeight = Math.max(7.0, arena.getMaxY() - arena.getMinY() + 4);
         int lifetime = 160;
 
-        // Déplacer/faire tournoyer les débris existants autour de la tornade la plus proche.
         Iterator<Debris> it = tornadoDebris.iterator();
         while (it.hasNext()) {
             Debris d = it.next();
@@ -455,16 +451,14 @@ public class DisasterManager implements MiniGame {
             }
             Vortex v = nearestVortex(d.display.getLocation());
             if (v == null) continue;
-            d.angle += 0.3;                                  // vitesse de rotation
-            d.height = Math.min(maxHeight, d.height + 0.18); // monte le long de l'entonnoir
-            d.radius = 1.0 + (d.height / maxHeight) * 3.0;   // entonnoir : plus large en haut
+            d.angle += 0.3;
+            d.height = Math.min(maxHeight, d.height + 0.18);
+            d.radius = 1.0 + (d.height / maxHeight) * 3.0;
             double px = v.center.getX() + Math.cos(d.angle) * d.radius - 0.5;
             double pz = v.center.getZ() + Math.sin(d.angle) * d.radius - 0.5;
-            // La tornade se déplace → les blocs la suivent car ils visent toujours son centre actuel.
             d.display.teleport(new Location(world, px, baseY + d.height, pz));
         }
 
-        // En arracher de nouveaux autour de chaque tornade.
         int maxTotal = 40 * vortices.size();
         if (tornadoDebris.size() < maxTotal && tickCounter % 2 == 0) {
             for (Vortex v : vortices) {
@@ -503,7 +497,6 @@ public class DisasterManager implements MiniGame {
 
         double speed = plugin.getConfig().getDouble("disaster.tornado.move-speed", 0.35);
 
-        // Nombre de tornades = intensité (fin de partie = plusieurs), plafonné par la config.
         int maxCount = Math.max(1, plugin.getConfig().getInt("disaster.tornado.max-count", 4));
         int desiredCount = Math.min(Math.max(1, intensity), maxCount);
         while (vortices.size() < desiredCount) {
@@ -526,8 +519,6 @@ public class DisasterManager implements MiniGame {
             v.center.setX(clamp(v.center.getX(), arena.getMinX(), arena.getMaxX()));
             v.center.setZ(clamp(v.center.getZ(), arena.getMinZ(), arena.getMaxZ()));
 
-            // Entonnoir allégé : peu de particules (les resource packs les masquent souvent),
-            // ce sont surtout les blocs emportés qui rendent la tornade visible.
             double funnelHeight = height * 2.0;
             for (double h = 0; h < funnelHeight; h += 0.9) {
                 double r = 2.0 + h * 0.35;
@@ -539,7 +530,6 @@ public class DisasterManager implements MiniGame {
                     world.spawnParticle(Particle.CLOUD, pLoc, 1, 0.2, 0.2, 0.2, 0.0);
                 }
             }
-            // Colonne centrale sombre pour bien la repérer de loin.
             for (double h = 0; h < funnelHeight; h += 1.6) {
                 Location core = new Location(world, v.center.getX(), baseY + h, v.center.getZ());
                 world.spawnParticle(Particle.LARGE_SMOKE, core, 1, 0.4, 0.2, 0.4, 0.02);
@@ -578,7 +568,6 @@ public class DisasterManager implements MiniGame {
             Vector velocity = toCenter.multiply(pull * factor)
                     .add(swirl.multiply(pull * factor));
             velocity.setY(lift * factor);
-            // On (re)garantit allowFlight juste avant de soulever, sinon le serveur kick "Flying is not enabled".
             p.setAllowFlight(true);
             p.setFlying(false);
             p.setFallDistance(0f);
@@ -640,7 +629,6 @@ public class DisasterManager implements MiniGame {
             world.setWeatherDuration(20 * 600);
             acidWeatherActive = true;
         }
-        // Force la pluie côté client (indépendant de la météo serveur), rafraîchie chaque seconde.
         if (tickCounter % 20 == 0) {
             for (UUID uuid : allInvolved()) {
                 Player p = plugin.getServer().getPlayer(uuid);
@@ -648,7 +636,6 @@ public class DisasterManager implements MiniGame {
             }
         }
 
-        // Pluie acide TRÈS visible : rideau de particules vertes qui tombent du ciel sur toute l'arène.
         int drops = Math.max(10, plugin.getConfig().getInt("disaster.acidrain.rain-particles", 40));
         Particle.DustOptions acid = new Particle.DustOptions(Color.LIME, 1.4f);
         double topY = arena.getMaxY() + 3;
@@ -664,7 +651,6 @@ public class DisasterManager implements MiniGame {
                     (arena.getMinZ() + arena.getMaxZ()) / 2), Sound.WEATHER_RAIN, 1.2f, 1.3f);
         }
 
-        // Dégâts sur les joueurs exposés au ciel : s'abriter sous un toit protège.
         int damageInterval = Math.max(1, (int) Math.round(
                 plugin.getConfig().getDouble("disaster.acidrain.damage-interval-seconds", 2.0) * 20));
         if (tickCounter % damageInterval == 0) {
@@ -739,12 +725,10 @@ public class DisasterManager implements MiniGame {
         for (int i = 0; i < count; i++) {
             double x = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
             double z = arena.getMinZ() + random.nextDouble() * (arena.getMaxZ() - arena.getMinZ());
-            // Clamp sous la limite du monde, sinon l'entité peut ne jamais apparaître.
             double y = Math.min(arena.getMaxY() + spawnHeight, world.getMaxHeight() - 2.0);
             Location loc = new Location(world, x, y, z);
 
             FallingBlock anvil = world.spawnFallingBlock(loc, Material.ANVIL.createBlockData());
-            // Petite impulsion vers le bas : assez pour menacer, assez lent pour rester visible.
             anvil.setVelocity(new Vector(0, -fallSpeed, 0));
             anvil.setHurtEntities(true);
             anvil.setDamagePerBlock(damagePerBlock);
@@ -807,7 +791,6 @@ public class DisasterManager implements MiniGame {
             }
         }
 
-        // Chaque seconde : contenir les zombies dans l'arène et recibler les survivants.
         if (tickCounter % 20 == 0) {
             for (Zombie zombie : alive) {
                 if (!arena.contains(zombie.getLocation())) {
@@ -839,7 +822,6 @@ public class DisasterManager implements MiniGame {
             Zombie zombie = world.spawn(loc, Zombie.class, z -> {
                 z.setAdult();
                 if (z.getEquipment() != null) {
-                    // Casque pour survivre au soleil
                     z.getEquipment().setHelmet(new ItemStack(Material.IRON_HELMET));
                     z.getEquipment().setHelmetDropChance(0f);
                 }
@@ -1421,7 +1403,6 @@ public class DisasterManager implements MiniGame {
         }
     }
 
-    /** Affiche un vrai titre au centre de l'écran pour tous les joueurs concernés. */
     private void broadcastTitle(String title, String subtitle) {
         Title t = buildTitle(title, subtitle);
         for (UUID uuid : allInvolved()) {

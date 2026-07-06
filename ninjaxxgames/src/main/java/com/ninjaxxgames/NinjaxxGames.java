@@ -81,7 +81,6 @@ public final class NinjaxxGames extends JavaPlugin {
         this.backgroundMusicManager = new BackgroundMusicManager(this);
         backgroundMusicManager.start();
 
-        // Saturation permanente partout : personne n'a jamais faim.
         getServer().getScheduler().runTaskTimer(this, () -> {
             for (var player : getServer().getOnlinePlayers()) {
                 player.addPotionEffect(new PotionEffect(
@@ -131,10 +130,6 @@ public final class NinjaxxGames extends JavaPlugin {
     public FormationManager getFormationManager() { return formationManager; }
     public PodiumManager getPodiumManager() { return podiumManager; }
 
-    /**
-     * Renvoie un joueur au hub : fin de session, inventaire vidé, téléportation,
-     * puis remise en état "hub" (steak + saturation + scoreboard).
-     */
     public void sendToHub(Player player) {
         sessionManager.clear(player.getUniqueId());
         player.getInventory().clear();

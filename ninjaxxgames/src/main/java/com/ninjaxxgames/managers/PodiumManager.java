@@ -19,10 +19,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-/**
- * Gère la salle de classement : un spawn par rang (top 1 à top 14), une salle générale
- * pour les autres joueurs, et une cérémonie qui téléporte tout le monde puis lance des feux d'artifice.
- */
 public class PodiumManager {
 
     public static final int MAX_RANKS = 14;
@@ -60,11 +56,6 @@ public class PodiumManager {
         return rankSpawns.size();
     }
 
-    /**
-     * Lance la cérémonie : téléporte le top 14 sur leurs spots, les autres dans la salle,
-     * puis lance des feux d'artifice sur le podium.
-     * @return message d'erreur, ou null si tout s'est bien passé.
-     */
     public String runCeremony() {
         if (rankSpawns.isEmpty()) {
             return "aucun spawn de classement défini (/ninjaxx setrankspawn <1-14>)";
@@ -167,9 +158,9 @@ public class PodiumManager {
 
     private Color rankColor(int rank) {
         return switch (rank) {
-            case 1 -> Color.fromRGB(255, 215, 0);   // or
+            case 1 -> Color.fromRGB(255, 215, 0);
             case 2 -> Color.SILVER;
-            case 3 -> Color.fromRGB(205, 127, 50);  // bronze
+            case 3 -> Color.fromRGB(205, 127, 50);
             default -> Color.fromRGB(random.nextInt(256), random.nextInt(256), random.nextInt(256));
         };
     }
@@ -203,7 +194,6 @@ public class PodiumManager {
                     Location loc = loadLoc(ranks.getConfigurationSection(key));
                     if (loc != null) rankSpawns.put(r, loc);
                 } catch (NumberFormatException ignored) {
-                    // clé non numérique ignorée
                 }
             }
         }

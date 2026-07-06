@@ -50,14 +50,11 @@ public class CrownGameListener implements Listener {
         if (crownGame == null || !crownGame.isRunning()) return;
         if (!crownGame.isActivePlayer(player.getUniqueId())) return;
 
-        // Le casque couronne : impossible de le retirer, le déplacer ou le remplacer.
         boolean touchesHelmet = event.getSlotType() == InventoryType.SlotType.ARMOR
                 && crownGame.isCrown(event.getCurrentItem());
-        // Touche numérotée / swap main : échangerait le casque contre un objet de la barre.
         boolean hotbarSwap = (event.getAction() == InventoryAction.HOTBAR_SWAP
                 || event.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD)
                 && event.getSlotType() == InventoryType.SlotType.ARMOR;
-        // Shift-clic qui déplacerait la couronne depuis l'inventaire vers l'emplacement casque.
         boolean movesCrown = crownGame.isCrown(event.getCurrentItem()) || crownGame.isCrown(event.getCursor());
 
         if (touchesHelmet || hotbarSwap || movesCrown) {

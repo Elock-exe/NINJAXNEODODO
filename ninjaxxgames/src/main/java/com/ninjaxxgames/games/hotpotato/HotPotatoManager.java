@@ -166,11 +166,9 @@ public class HotPotatoManager implements MiniGame {
                 exploded.add(entry.getKey());
             } else {
                 potatoTimers.put(entry.getKey(), left);
-                // Compte à rebours "ding-dong" au porteur pendant les dernières secondes.
                 if (left <= warning) {
                     Player holder = plugin.getServer().getPlayer(entry.getKey());
                     if (holder != null) {
-                        // Note alternée (ding / dong) + pitch qui monte à l'approche de l'explosion.
                         float pitch = (left % 2 == 0) ? 1.4f : 0.9f;
                         holder.playSound(holder.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.4f, pitch);
                     }
@@ -228,7 +226,6 @@ public class HotPotatoManager implements MiniGame {
         return min + random.nextInt(max - min + 1);
     }
 
-    /** Un participant actif ne doit jamais perdre de vie : le listener annule les dégâts. */
     public boolean isActiveParticipant(Player player) {
         return running && activePlayers.contains(player.getUniqueId());
     }
@@ -252,7 +249,6 @@ public class HotPotatoManager implements MiniGame {
         updateScoreboards();
     }
 
-    /** Effet "wind burst" : envoie la victime valser (sans dégâts, les dégâts sont annulés par le listener). */
     private void applyWindBurst(Player from, Player victim) {
         Vector push = victim.getLocation().toVector().subtract(from.getLocation().toVector());
         push.setY(0);

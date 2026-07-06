@@ -352,8 +352,6 @@ public class NinjaxxCommand implements CommandExecutor, TabCompleter {
         Player leader = requirePlayer(sender);
         if (leader == null) return;
 
-        // Nombre par rangée optionnel : /ninjaxx lineplayers [parRangée]
-        // Sans argument, il est calculé automatiquement selon le nombre de joueurs connectés.
         Integer perRow = null;
         if (args.length >= 2) {
             try {

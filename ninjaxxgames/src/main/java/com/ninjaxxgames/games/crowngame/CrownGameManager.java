@@ -176,7 +176,6 @@ public class CrownGameManager implements MiniGame {
             crownTime.merge(holder, 1, Integer::sum);
         }
 
-        // Événement de chaos périodique : pimente la manche avec un effet surprise.
         if (--nextEventIn <= 0) {
             triggerChaosEvent();
             nextEventIn = plugin.getConfig().getInt("crowngame.event-interval-seconds", 25);
@@ -189,7 +188,6 @@ public class CrownGameManager implements MiniGame {
         }
     }
 
-    /** Événement aléatoire appliqué à tous les joueurs actifs pour dynamiser la manche. */
     private void triggerChaosEvent() {
         if (!plugin.getConfig().getBoolean("crowngame.events-enabled", true)) return;
         if (activePlayers.size() < 2) return;
@@ -225,7 +223,6 @@ public class CrownGameManager implements MiniGame {
         broadcast("§6[Crown Game] " + title + " §f— " + subtitle);
     }
 
-    /** Rafale de vent globale : tout le monde est projeté vers le haut, la couronne peut changer de main. */
     private void chaosWindGust() {
         broadcast("§6[Crown Game] §f§l💨 RAFALE DE VENT ! §7— tenez-vous prêts !");
         for (UUID uuid : activePlayers) {
@@ -461,7 +458,6 @@ public class CrownGameManager implements MiniGame {
         p.sendMessage("§6👑 [Crown Game] §fTu as la couronne ! §7Garde-la pour survivre à la manche.");
     }
 
-    /** Rafale de vent qui projette le porteur touché au moment où on lui prend la couronne (façon enchantement Rafale de la masse). */
     private void windBurstHit(Player attacker, Player victim) {
         World world = victim.getWorld();
         Location center = victim.getLocation();
@@ -471,7 +467,6 @@ public class CrownGameManager implements MiniGame {
         world.spawnParticle(Particle.GUST_EMITTER_LARGE, center.clone().add(0, 1, 0), 1, 0, 0, 0, 0);
         world.spawnParticle(Particle.GUST, center.clone().add(0, 1, 0), 25, 1.4, 1.0, 1.4, 0.1);
 
-        // Projette la victime loin de l'attaquant, avec une forte poussée verticale.
         Vector push = victim.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (push.lengthSquared() < 0.0001) push = new Vector(0, 1, 0);
         push.normalize().multiply(1.4);
@@ -479,7 +474,6 @@ public class CrownGameManager implements MiniGame {
         victim.setVelocity(victim.getVelocity().add(push));
     }
 
-    /** Effet de rafale de vent (wind burst) au moment où l'on récupère la couronne. */
     private void windBurst(Player p) {
         World world = p.getWorld();
         Location center = p.getLocation();
@@ -489,7 +483,6 @@ public class CrownGameManager implements MiniGame {
         world.spawnParticle(Particle.GUST_EMITTER_LARGE, center.clone().add(0, 1, 0), 1, 0, 0, 0, 0);
         world.spawnParticle(Particle.GUST, center.clone().add(0, 1, 0), 20, 1.2, 0.8, 1.2, 0.1);
 
-        // Repousse les joueurs proches, comme une véritable rafale.
         double radius = 4.0;
         for (UUID uuid : activePlayers) {
             if (uuid.equals(p.getUniqueId())) continue;
@@ -534,7 +527,6 @@ public class CrownGameManager implements MiniGame {
         return meta != null && meta.hasDisplayName() && CROWN_ITEM_NAME.equals(meta.getDisplayName());
     }
 
-    /** Utilisé par le listener pour empêcher de retirer la couronne du casque. */
     public boolean isCrown(ItemStack item) {
         return item != null && item.getType() == Material.GOLDEN_HELMET && isCrownItem(item);
     }
