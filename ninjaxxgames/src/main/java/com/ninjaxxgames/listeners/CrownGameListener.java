@@ -7,6 +7,12 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.projectiles.ProjectileSource;
 
 public class CrownGameListener implements Listener {
@@ -30,6 +36,54 @@ public class CrownGameListener implements Listener {
 
         if (plugin.getEventManager().get(CrownGameManager.ID) instanceof CrownGameManager crownGame) {
             crownGame.handleHit(attacker, victim);
+        }
+    }
+
+    private CrownGameManager crownGame() {
+        return plugin.getEventManager().get(CrownGameManager.ID) instanceof CrownGameManager cg ? cg : null;
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        CrownGameManager crownGame = crownGame();
+        if (crownGame == null || !crownGame.isRunning()) return;
+        if (!crownGame.isActivePlayer(player.getUniqueId())) return;
+
+        // Le casque couronne : impossible de le retirer, le déplacer ou le remplacer.
+        boolean touchesHelmet = event.getSlotType() == InventoryType.SlotType.ARMOR
+                && crownGame.isCrown(event.getCurrentItem());
+        // Touche numérotée / swap main : échangerait le casque contre un objet de la barre.
+        boolean hotbarSwap = (event.getAction() == InventoryAction.HOTBAR_SWAP
+                || event.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD)
+                && event.getSlotType() == InventoryType.SlotType.ARMOR;
+        // Shift-clic qui déplacerait la couronne depuis l'inventaire vers l'emplacement casque.
+        boolean movesCrown = crownGame.isCrown(event.getCurrentItem()) || crownGame.isCrown(event.getCursor());
+
+        if (touchesHelmet || hotbarSwap || movesCrown) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        CrownGameManager crownGame = crownGame();
+        if (crownGame == null || !crownGame.isRunning()) return;
+        if (!crownGame.isActivePlayer(player.getUniqueId())) return;
+
+        if (crownGame.isCrown(event.getOldCursor()) || crownGame.isCrown(event.getCursor())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onDrop(PlayerDropItemEvent event) {
+        CrownGameManager crownGame = crownGame();
+        if (crownGame == null || !crownGame.isRunning()) return;
+        ItemStack dropped = event.getItemDrop().getItemStack();
+        if (crownGame.isCrown(dropped)) {
+            event.setCancelled(true);
         }
     }
 

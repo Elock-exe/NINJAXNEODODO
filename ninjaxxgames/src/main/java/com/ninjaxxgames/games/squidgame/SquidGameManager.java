@@ -5,6 +5,9 @@ import com.ninjaxxgames.games.GlowSidebar;
 import com.ninjaxxgames.games.MiniGame;
 import com.ninjaxxgames.managers.PlayerSessionManager;
 import com.ninjaxxgames.models.Zone;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -13,13 +16,15 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.time.Duration;
 import java.util.*;
 
 public class SquidGameManager implements MiniGame {
 
     public static final String ID = "squidgame";
 
-    private static final double MOVE_THRESHOLD = 0.08;
+    private long redLightStartMs;
+    private boolean redIncoming;
 
     private final NinjaxxGames plugin;
     private final GlowSidebar scoreboard = new GlowSidebar(ChatColor.GREEN, "sg_team", "sg_sb");
@@ -36,6 +41,7 @@ public class SquidGameManager implements MiniGame {
     private BukkitTask mainTask;
     private BukkitTask lightTask;
     private BukkitTask timerTask;
+    private BukkitTask actionBarTask;
     private int remainingRoundSeconds;
 
     public SquidGameManager(NinjaxxGames plugin) {
@@ -126,9 +132,11 @@ public class SquidGameManager implements MiniGame {
         int participation = plugin.getConfig().getInt("squidgame.points.participation", 10);
         int winBonus = plugin.getConfig().getInt("squidgame.points.win-bonus", 100);
         broadcast("§8§m                                        ");
-        broadcast("§a§l1, 2, 3 SOLEIL §7— (Red Light / Green Light)");
-        broadcast("§7• §aGREEN LIGHT §7: tu peux avancer vers la ligne d'arrivée.");
-        broadcast("§7• §cRED LIGHT §7: §lSTOP §r§7! Si tu bouges, tu es §céliminé§7.");
+        broadcast("§a§l1, 2, 3 SOLEIL");
+        broadcast("§7• §a§l🟢 VERT §7(gros titre vert à l'écran) : §aAVANCE !");
+        broadcast("§7• §c§l🔴 ROUGE §7(gros titre rouge à l'écran) : §cSTOP, ne bouge plus !");
+        broadcast("§7  Si tu bouges pendant le §cROUGE§7, tu es §céliminé§7.");
+        broadcast("§7• Un §e⚠ avertissement §7apparaît juste avant chaque ROUGE.");
         broadcast("§7• Franchis la ligne d'arrivée le plus vite possible !");
         broadcast("§7• Points : §e" + participation + " §fpour tous §7+ jusqu'à §e" + winBonus
                 + " §fselon ta place (§e" + (participation + winBonus) + " §fpour le 1er).");
@@ -238,14 +246,46 @@ public class SquidGameManager implements MiniGame {
             }
         }.runTaskTimer(plugin, 20L, 20L);
 
+        // Rappel permanent en bas de l'écran de l'état actuel (VERT/ROUGE) : la course est plus lisible.
+        actionBarTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (phase == SquidGamePhase.FINISHED) {
+                    cancel();
+                    return;
+                }
+                Component bar = currentLightActionBar();
+                if (bar == null) return;
+                for (UUID uuid : activePlayers) {
+                    Player p = plugin.getServer().getPlayer(uuid);
+                    if (p != null) p.sendActionBar(bar);
+                }
+            }
+        }.runTaskTimer(plugin, 5L, 5L);
+
         scheduleGreenLight();
+    }
+
+    /** Texte permanent affiché en bas de l'écran selon l'état du feu (null si pas en course). */
+    private Component currentLightActionBar() {
+        return switch (phase) {
+            case GREEN_LIGHT -> redIncoming
+                    ? legacy("§6§l⚠ ATTENTION §r§7— §ele ROUGE arrive, prépare-toi à t'arrêter !")
+                    : legacy("§a§l🟢 VERT §r§7— §a§lAVANCE !");
+            case RED_LIGHT -> legacy("§c§l🔴 ROUGE §r§7— §c§lSTOP, NE BOUGE PLUS !");
+            default -> null;
+        };
     }
 
     private void scheduleGreenLight() {
         if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.GREEN_LIGHT;
-        // Feu signalé uniquement au son (pas d'affichage à l'écran).
-        broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 2.0f);
+        redIncoming = false;
+        // Signal TRÈS clair : gros titre vert + son franc.
+        broadcastTitle("§a§l🟢 VERT", "§a§lAVANCE !", 2, 24, 4);
+        broadcastActionBar("§a§l➤ AVANCE ! ➤");
+        broadcastSound(Sound.BLOCK_NOTE_BLOCK_PLING, 1.6f, 2.0f);
+        broadcastSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.4f, 1.4f);
         updateScoreboard();
         for (UUID uuid : activePlayers) {
             lastLocations.put(uuid, getPlayerLoc(uuid));
@@ -269,13 +309,16 @@ public class SquidGameManager implements MiniGame {
 
     private void warnRedLight(long delayTicks) {
         if (phase == SquidGamePhase.FINISHED) return;
-        // Avertissement avant le rouge : uniquement au son.
-        broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 0.8f);
+        redIncoming = true;
+        // Avertissement clair : le rouge arrive, prépare-toi à t'arrêter.
+        broadcastActionBar("§e§l⚠ ATTENTION — le ROUGE arrive... prépare-toi à t'arrêter !");
+        broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 1.2f, 0.8f);
         new BukkitRunnable() {
             @Override
             public void run() {
                 if (phase == SquidGamePhase.GREEN_LIGHT) {
-                    broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 1.2f);
+                    broadcastActionBar("§6§l⚠ STOP dans un instant !");
+                    broadcastSound(Sound.BLOCK_NOTE_BLOCK_HAT, 1.2f, 1.2f);
                 }
             }
         }.runTaskLater(plugin, Math.max(1L, delayTicks / 2));
@@ -291,8 +334,13 @@ public class SquidGameManager implements MiniGame {
     private void scheduleRedLight() {
         if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.RED_LIGHT;
-        // Feu rouge signalé uniquement au son (pas d'affichage à l'écran).
-        broadcastSound(Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f);
+        redIncoming = false;
+        redLightStartMs = System.currentTimeMillis();
+        // Signal TRÈS clair : gros titre rouge + son fort et grave.
+        broadcastTitle("§c§l🔴 ROUGE", "§c§lSTOP — NE BOUGE PLUS !", 0, 30, 4);
+        broadcastActionBar("§c§l✋ STOP ! NE BOUGE PLUS ✋");
+        broadcastSound(Sound.BLOCK_NOTE_BLOCK_BASS, 1.6f, 0.5f);
+        broadcastSound(Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
         updateScoreboard();
         for (UUID uuid : activePlayers) {
             lastLocations.put(uuid, getPlayerLoc(uuid));
@@ -405,6 +453,7 @@ public class SquidGameManager implements MiniGame {
         if (mainTask != null) mainTask.cancel();
         if (lightTask != null) lightTask.cancel();
         if (timerTask != null) timerTask.cancel();
+        if (actionBarTask != null) actionBarTask.cancel();
     }
 
     public SquidGamePhase getPhase() {
@@ -456,14 +505,19 @@ public class SquidGameManager implements MiniGame {
         }
 
         if (phase == SquidGamePhase.RED_LIGHT) {
+            // Délai de grâce après le passage au rouge : temps de réaction, pas d'élimination.
+            double graceSeconds = plugin.getConfig().getDouble("squidgame.red-light-grace-seconds", 0.8);
+            boolean inGrace = System.currentTimeMillis() - redLightStartMs < (long) (graceSeconds * 1000);
+
             Location last = lastLocations.get(uuid);
-            if (last != null && last.getWorld() != null && to.getWorld() != null
+            if (!inGrace && last != null && last.getWorld() != null && to.getWorld() != null
                     && last.getWorld().equals(to.getWorld())) {
+                double threshold = plugin.getConfig().getDouble("squidgame.move-threshold", 0.25);
                 double dx = last.getX() - to.getX();
                 double dz = last.getZ() - to.getZ();
                 double distSq = dx * dx + dz * dz;
-                if (distSq > MOVE_THRESHOLD * MOVE_THRESHOLD) {
-                    eliminatePlayer(player, "§c[Squid Game] §fÉliminé : mouvement pendant Red Light !");
+                if (distSq > threshold * threshold) {
+                    eliminatePlayer(player, "§c[Squid Game] §fÉliminé : mouvement pendant le ROUGE !");
                     return;
                 }
             }
@@ -514,10 +568,7 @@ public class SquidGameManager implements MiniGame {
     }
 
     private void sendToHub(Player player) {
-        plugin.getSessionManager().clear(player.getUniqueId());
-        if (plugin.getZoneManager().hasHub()) {
-            player.teleport(plugin.getZoneManager().getHub());
-        }
+        plugin.sendToHub(player);
     }
 
     private void broadcast(String message) {
@@ -528,12 +579,43 @@ public class SquidGameManager implements MiniGame {
     }
 
     private void broadcastSound(Sound sound, float pitch) {
+        broadcastSound(sound, 1f, pitch);
+    }
+
+    private void broadcastSound(Sound sound, float volume, float pitch) {
         for (UUID uuid : allInvolved()) {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p != null) {
-                p.playSound(p.getLocation(), sound, 1f, pitch);
+                p.playSound(p.getLocation(), sound, volume, pitch);
             }
         }
+    }
+
+    /** Gros titre au centre de l'écran (durées en ticks). */
+    private void broadcastTitle(String title, String subtitle, int fadeInTicks, int stayTicks, int fadeOutTicks) {
+        Title t = Title.title(
+                legacy(title),
+                legacy(subtitle),
+                Title.Times.times(
+                        Duration.ofMillis(fadeInTicks * 50L),
+                        Duration.ofMillis(stayTicks * 50L),
+                        Duration.ofMillis(fadeOutTicks * 50L)));
+        for (UUID uuid : allInvolved()) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p != null) p.showTitle(t);
+        }
+    }
+
+    private void broadcastActionBar(String message) {
+        Component component = legacy(message);
+        for (UUID uuid : allInvolved()) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p != null) p.sendActionBar(component);
+        }
+    }
+
+    private Component legacy(String legacy) {
+        return LegacyComponentSerializer.legacySection().deserialize(legacy);
     }
 
     private Set<UUID> allInvolved() {

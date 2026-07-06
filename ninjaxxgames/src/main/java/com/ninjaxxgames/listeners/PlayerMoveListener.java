@@ -3,10 +3,15 @@ package com.ninjaxxgames.listeners;
 import com.ninjaxxgames.NinjaxxGames;
 import com.ninjaxxgames.games.squidgame.SquidGameManager;
 import com.ninjaxxgames.models.Lift;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+
+import java.time.Duration;
 
 public class PlayerMoveListener implements Listener {
 
@@ -64,5 +69,21 @@ public class PlayerMoveListener implements Listener {
         if (lift.getSpawn() != null) {
             player.teleport(lift.getSpawn());
         }
+
+        announceGame(player, game.getDisplayName());
+    }
+
+    /** Gros titre au centre de l'écran indiquant le mode de jeu rejoint. */
+    private void announceGame(Player player, String gameName) {
+        Title title = Title.title(
+                LegacyComponentSerializer.legacySection().deserialize("§6§l" + gameName),
+                LegacyComponentSerializer.legacySection().deserialize("§7Bienvenue — bonne chance !"),
+                Title.Times.times(
+                        Duration.ofMillis(250),
+                        Duration.ofMillis(2500),
+                        Duration.ofMillis(500)));
+        player.showTitle(title);
+        player.sendMessage("§6🛗 [Ascenseur] §fTu es arrivé dans le mode §e§l" + gameName + " §f! Bonne chance !");
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, 1.4f);
     }
 }

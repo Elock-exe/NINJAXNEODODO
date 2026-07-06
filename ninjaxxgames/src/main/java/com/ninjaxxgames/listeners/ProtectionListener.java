@@ -10,6 +10,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 
@@ -61,6 +62,15 @@ public class ProtectionListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        // En dehors d'un mini-jeu (donc au hub), on ne ramasse aucun item/bloc au sol.
+        if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) == null) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (!plugin.getConfig().getBoolean("disable-mob-spawning", true)) {
             return;
@@ -76,6 +86,12 @@ public class ProtectionListener implements Listener {
 
     private boolean isProtected(Player player, Location loc) {
         if (player.hasPermission("ninjaxxgames.admin")) {
+            return false;
+        }
+        // Les survivants du Disaster peuvent utiliser leurs objets de ravitaillement
+        // (eau, bloc de slime) dans l'arène — elle est régénérée en fin de partie.
+        if (plugin.getEventManager().get(DisasterManager.ID) instanceof DisasterManager disaster
+                && disaster.isActive(player.getUniqueId()) && disaster.isInArena(loc)) {
             return false;
         }
         if (plugin.getSessionManager().getCurrentGame(player.getUniqueId()) != null) {

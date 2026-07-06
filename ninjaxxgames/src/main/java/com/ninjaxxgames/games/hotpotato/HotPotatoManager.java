@@ -158,6 +158,7 @@ public class HotPotatoManager implements MiniGame {
 
     private void tick() {
 
+        int warning = Math.max(1, plugin.getConfig().getInt("hotpotato.warning-seconds", 10));
         List<UUID> exploded = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : new HashMap<>(potatoTimers).entrySet()) {
             int left = entry.getValue() - 1;
@@ -165,6 +166,15 @@ public class HotPotatoManager implements MiniGame {
                 exploded.add(entry.getKey());
             } else {
                 potatoTimers.put(entry.getKey(), left);
+                // Compte à rebours "ding-dong" au porteur pendant les dernières secondes.
+                if (left <= warning) {
+                    Player holder = plugin.getServer().getPlayer(entry.getKey());
+                    if (holder != null) {
+                        // Note alternée (ding / dong) + pitch qui monte à l'approche de l'explosion.
+                        float pitch = (left % 2 == 0) ? 1.4f : 0.9f;
+                        holder.playSound(holder.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.4f, pitch);
+                    }
+                }
             }
         }
 
@@ -515,10 +525,7 @@ public class HotPotatoManager implements MiniGame {
     }
 
     private void sendToHub(Player player) {
-        plugin.getSessionManager().clear(player.getUniqueId());
-        if (plugin.getZoneManager().hasHub()) {
-            player.teleport(plugin.getZoneManager().getHub());
-        }
+        plugin.sendToHub(player);
     }
 
     private void broadcast(String message) {

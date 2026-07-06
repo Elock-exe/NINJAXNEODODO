@@ -816,10 +816,7 @@ public class PropHuntManager implements MiniGame {
     }
 
     private void sendToHub(Player player) {
-        plugin.getSessionManager().clear(player.getUniqueId());
-        if (plugin.getZoneManager().hasHub()) {
-            player.teleport(plugin.getZoneManager().getHub());
-        }
+        plugin.sendToHub(player);
     }
 
     private void broadcast(String message) {
