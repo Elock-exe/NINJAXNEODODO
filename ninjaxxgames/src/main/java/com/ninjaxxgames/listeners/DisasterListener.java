@@ -3,17 +3,24 @@ package com.ninjaxxgames.listeners;
 import com.ninjaxxgames.NinjaxxGames;
 import com.ninjaxxgames.games.disaster.DisasterManager;
 import org.bukkit.Material;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 
 public class DisasterListener implements Listener {
 
@@ -55,6 +62,35 @@ public class DisasterListener implements Listener {
         if (manager == null || !manager.isRunning()) return;
         if (!manager.isMeteor(event.getEntity().getUniqueId())) return;
         manager.handleMeteorExplode(event);
+    }
+
+    @EventHandler
+    public void onAnvilLand(EntityChangeBlockEvent event) {
+        if (!(event.getEntity() instanceof FallingBlock)) return;
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isRunning()) return;
+        manager.handleAnvilLand(event);
+    }
+
+    @EventHandler
+    public void onZombieDeath(EntityDeathEvent event) {
+        if (!(event.getEntity() instanceof Zombie zombie)) return;
+        DisasterManager manager = manager();
+        if (manager == null) return;
+        if (manager.handleZombieDeath(zombie.getUniqueId())) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+        }
+    }
+
+    // Le seau d'eau du ravitaillement est à usage unique : pas de seau vide rendu.
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        DisasterManager manager = manager();
+        if (manager == null || !manager.isActive(event.getPlayer().getUniqueId())) return;
+        ItemStack held = event.getPlayer().getInventory().getItem(event.getHand());
+        if (!manager.isSupplyBucket(held)) return;
+        event.setItemStack(new ItemStack(Material.AIR));
     }
 
     @EventHandler(ignoreCancelled = true)

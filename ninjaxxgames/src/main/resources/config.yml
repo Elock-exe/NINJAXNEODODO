@@ -72,6 +72,9 @@ disaster:
     - meteor
     - tornado
     - lightning
+    - acidrain
+    - anvilrain
+    - zombies
   dash:
     enabled: true
     strength: 1.4
@@ -98,6 +101,31 @@ disaster:
     interval-ticks: 30
     strikes-per-wave: 2
     target-players: false
+  acidrain:
+    # Dégâts par seconde sur les joueurs exposés au ciel (s'abriter protège)
+    damage-per-second: 1.0
+    # Dissolution lente des blocs exposés : toutes les X ticks, quelques blocs fondent
+    dissolve-interval-ticks: 30
+    dissolve-per-cycle: 2
+  anvilrain:
+    interval-ticks: 18
+    count-per-wave: 2
+    # Dégâts par bloc de chute (une enclume qui tombe de haut fait très mal)
+    damage-per-block: 4.0
+    max-damage: 20
+    spawn-height: 25.0
+    # Rayon de blocs cassés à l'impact (0 = aucun dégât aux constructions)
+    break-radius: 1
+  zombies:
+    spawn-interval-ticks: 80
+    per-spawn: 2
+    max-alive: 8
+  # Ravitaillements : objets spéciaux qui apparaissent aléatoirement dans l'arène
+  # (seau d'eau à usage unique, potion de soin, bloc de slime, steak — tiré au hasard)
+  supply:
+    enabled: true
+    interval-seconds: 12
+    max-on-ground: 6
   points:
     participation: 10
     win-bonus: 100
