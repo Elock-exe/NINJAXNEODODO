@@ -165,6 +165,8 @@ disaster:
 interlude:
   duration-seconds: 120
   points-per-kill: 30
+  # Brouillard : limite la vision des joueurs à ~5 blocks (combat rapproché)
+  fog-effect: true
 
 # Musique de fond custom via NoteBlockAPI (chansons Note Block Studio .nbs).
 # Nécessite le plugin NoteBlockAPI installé sur le serveur.

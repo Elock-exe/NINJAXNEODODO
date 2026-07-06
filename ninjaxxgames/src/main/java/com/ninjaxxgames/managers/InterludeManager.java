@@ -10,6 +10,8 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -57,6 +59,7 @@ public class InterludeManager {
             if (plugin.getSessionManager().getCurrentGame(p.getUniqueId()) != null) continue;
             participants.add(p.getUniqueId());
             p.getInventory().addItem(createSword());
+            applyFog(p);
             sendTitle(p, "§4§l⚔ INTERLUDE", "§fChacun pour soi ! §e+" + points + " pts §fpar kill");
             p.sendMessage("§4⚔ [Interlude] §fPériode de chaos : tape tout le monde avec ton épée en bois !");
             p.sendMessage("§4⚔ [Interlude] §fChaque kill rapporte §e" + points + " points §fajoutés à la fin.");
@@ -83,6 +86,7 @@ public class InterludeManager {
         for (UUID uuid : participants) {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p == null) continue;
+            applyFog(p);
             p.sendActionBar(Component.text("§4⚔ Interlude §f" + time
                     + " §7| §fTes kills : §e" + kills.getOrDefault(uuid, 0)));
             if (secondsLeft <= 5) {
@@ -137,6 +141,7 @@ public class InterludeManager {
             Player p = plugin.getServer().getPlayer(uuid);
             if (p == null) continue;
             removeSword(p);
+            p.removePotionEffect(PotionEffectType.BLINDNESS);
             p.setHealth(maxHealth(p));
             sendTitle(p, "§a§lINTERLUDE TERMINÉE", topLine);
             p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.5f);
@@ -164,6 +169,13 @@ public class InterludeManager {
 
     private int pointsPerKill() {
         return Math.max(1, plugin.getConfig().getInt("interlude.points-per-kill", 30));
+    }
+
+    /** Brouillard : réduit la vision à quelques blocks (combat rapproché). */
+    private void applyFog(Player p) {
+        if (!plugin.getConfig().getBoolean("interlude.fog-effect", true)) return;
+        // Cécité rafraîchie en continu : mur de brouillard noir à ~5 blocks, sans particules.
+        p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0, false, false, false));
     }
 
     private ItemStack createSword() {

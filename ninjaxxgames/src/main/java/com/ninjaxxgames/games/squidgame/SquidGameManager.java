@@ -241,6 +241,7 @@ public class SquidGameManager implements MiniGame {
                 updateScoreboard();
                 if (remainingRoundSeconds <= 0) {
                     cancel();
+                    broadcast("§6[Squid Game] §fLe temps est écoulé !");
                     endGame();
                 }
             }
@@ -376,10 +377,20 @@ public class SquidGameManager implements MiniGame {
         resetState();
     }
 
+    /** Termine la partie dès qu'il n'y a plus personne en course (tous arrivés ou éliminés). */
+    private void checkAllCleared() {
+        if (phase == SquidGamePhase.FINISHED) return;
+        if (activePlayers.isEmpty()) {
+            broadcast("§6[Squid Game] §fPlus personne en course — fin de la partie !");
+            endGame();
+        }
+    }
+
     private void endGame() {
+        if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.FINISHED;
         cancelTasks();
-        broadcast("§6[Squid Game] §fLe temps est écoulé ! Calcul du classement...");
+        broadcast("§6[Squid Game] §fCalcul du classement...");
 
         List<UUID> standings = new ArrayList<>(finishOrder);
         for (UUID uuid : activePlayers) {
@@ -503,8 +514,16 @@ public class SquidGameManager implements MiniGame {
             double graceSeconds = plugin.getConfig().getDouble("squidgame.red-light-grace-seconds", 0.8);
             boolean inGrace = System.currentTimeMillis() - redLightStartMs < (long) (graceSeconds * 1000);
 
+            // Pendant la grâce, on laisse le joueur se stabiliser : on suit sa position.
+            if (inGrace) {
+                lastLocations.put(uuid, to.clone());
+                return;
+            }
+
+            // Après la grâce, la position de référence est FIGÉE : tout déplacement cumulé élimine
+            // (empêche de ramper lentement sous le seuil à chaque pas).
             Location last = lastLocations.get(uuid);
-            if (!inGrace && last != null && last.getWorld() != null && to.getWorld() != null
+            if (last != null && last.getWorld() != null && to.getWorld() != null
                     && last.getWorld().equals(to.getWorld())) {
                 double threshold = plugin.getConfig().getDouble("squidgame.move-threshold", 0.25);
                 double dx = last.getX() - to.getX();
@@ -512,9 +531,10 @@ public class SquidGameManager implements MiniGame {
                 double distSq = dx * dx + dz * dz;
                 if (distSq > threshold * threshold) {
                     eliminatePlayer(player, "§c[Squid Game] §fÉliminé : mouvement pendant le ROUGE !");
-                    return;
                 }
             }
+            // On ne met PAS à jour lastLocations ici : la référence reste figée pendant le rouge.
+            return;
         }
 
         lastLocations.put(uuid, to.clone());
@@ -530,6 +550,7 @@ public class SquidGameManager implements MiniGame {
                 + " §f! Attends la fin de la partie.");
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
         updateScoreboard();
+        checkAllCleared();
     }
 
     private void eliminatePlayer(Player player, String reason) {
@@ -545,6 +566,7 @@ public class SquidGameManager implements MiniGame {
         if (eliminatedZone != null) {
             teleportToZoneCenter(player, eliminatedZone);
         }
+        checkAllCleared();
     }
 
     private Location getPlayerLoc(UUID uuid) {
