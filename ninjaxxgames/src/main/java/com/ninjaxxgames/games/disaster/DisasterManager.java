@@ -276,6 +276,9 @@ public class DisasterManager implements MiniGame {
                 plugin.getLogger().warning("[Disaster] Catastrophe inconnue ignorée : '" + d + "'");
             }
         }
+        if (plugin.getConfig().getBoolean("disaster.random-order", true)) {
+            Collections.shuffle(valid, random);
+        }
         return valid;
     }
 

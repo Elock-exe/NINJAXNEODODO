@@ -85,6 +85,8 @@ disaster:
   # Régénération progressive : nombre de blocs restaurés par tick (plus bas = plus lent, moins de lag)
   regen-blocks-per-tick: 20000
 
+  # L'ordre des catastrophes est mélangé aléatoirement à chaque partie (false = ordre de la liste)
+  random-order: true
   rounds:
     - meteor
     - tornado
