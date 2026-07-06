@@ -6,7 +6,6 @@ import com.ninjaxxgames.games.MiniGame;
 import com.ninjaxxgames.managers.PlayerSessionManager;
 import com.ninjaxxgames.models.Zone;
 import org.bukkit.ChatColor;
-import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -636,15 +635,6 @@ public class DisasterManager implements MiniGame {
             }
         }
 
-        int drops = Math.max(10, plugin.getConfig().getInt("disaster.acidrain.rain-particles", 40));
-        Particle.DustOptions acid = new Particle.DustOptions(Color.LIME, 1.4f);
-        double topY = arena.getMaxY() + 3;
-        for (int i = 0; i < drops; i++) {
-            double rx = arena.getMinX() + random.nextDouble() * (arena.getMaxX() - arena.getMinX());
-            double rz = arena.getMinZ() + random.nextDouble() * (arena.getMaxZ() - arena.getMinZ());
-            double ry = arena.getMinY() + random.nextDouble() * (topY - arena.getMinY());
-            world.spawnParticle(Particle.DUST, new Location(world, rx, ry, rz), 1, 0.0, 0.0, 0.0, 0.0, acid);
-        }
         if (tickCounter % 40 == 0) {
             world.playSound(new Location(world,
                     (arena.getMinX() + arena.getMaxX()) / 2, arena.getMaxY(),
@@ -663,8 +653,6 @@ public class DisasterManager implements MiniGame {
                 if (world.getHighestBlockYAt(pl) > pl.getBlockY()) continue;
                 p.damage(damage);
                 p.sendActionBar(net.kyori.adventure.text.Component.text("§a☔ Pluie acide ! §fAbrite-toi sous un toit !"));
-                world.spawnParticle(Particle.DUST, pl.clone().add(0, 1.2, 0), 10, 0.3, 0.6, 0.3,
-                        new Particle.DustOptions(Color.LIME, 1.1f));
                 p.playSound(pl, Sound.BLOCK_LAVA_EXTINGUISH, 0.25f, 1.8f);
             }
         }
@@ -682,8 +670,6 @@ public class DisasterManager implements MiniGame {
                 Block block = world.getBlockAt(x, y, z);
                 if (block.getType().isAir() || block.isLiquid()) continue;
                 Location center = block.getLocation().add(0.5, 1.0, 0.5);
-                world.spawnParticle(Particle.DUST, center, 12, 0.3, 0.3, 0.3,
-                        new Particle.DustOptions(Color.GREEN, 1.2f));
                 world.playSound(center, Sound.BLOCK_FIRE_EXTINGUISH, 0.5f, 1.6f);
                 block.setType(Material.AIR, false);
                 break;

@@ -125,8 +125,6 @@ disaster:
     damage-amount: 1.0
     # Intervalle entre deux dégâts, en secondes (1 dégât toutes les 2 secondes par défaut)
     damage-interval-seconds: 2.0
-    # Nombre de particules de pluie verte par tick (plus élevé = pluie acide bien plus visible)
-    rain-particles: 40
     # Dissolution lente des blocs exposés : toutes les X ticks, quelques blocs fondent
     dissolve-interval-ticks: 30
     dissolve-per-cycle: 2
