@@ -63,6 +63,8 @@ public class PlayerMoveListener implements Listener {
                     + " mais destination invalide : '" + lift.getDestination() + "'");
             return;
         }
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
         game.addPlayer(player);
 
         if (lift.getSpawn() != null) {

@@ -75,7 +75,11 @@ public class PlayerJoinListener implements Listener {
 
     @EventHandler
     public void onHunger(FoodLevelChangeEvent event) {
-        if (!(event.getEntity() instanceof Player)) return;
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (plugin.getEventManager().get(DisasterManager.ID) instanceof DisasterManager dm
+                && dm.isActive(player.getUniqueId())) {
+            return;
+        }
         if (event.getFoodLevel() < 20) {
             event.setFoodLevel(20);
         }

@@ -13,6 +13,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.WeatherType;
 import org.bukkit.World;
+import org.bukkit.WorldBorder;
 import org.bukkit.block.Block;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.FallingBlock;
@@ -23,6 +24,7 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -62,6 +64,7 @@ public class DisasterManager implements MiniGame {
     private final Set<UUID> zombieEntities = new HashSet<>();
     private final Set<UUID> supplyItems = new HashSet<>();
     private boolean acidWeatherActive = false;
+    private WorldBorder purgeBorder;
 
     private boolean running = false;
     private BukkitTask tickTask;
@@ -148,6 +151,7 @@ public class DisasterManager implements MiniGame {
         clearGameItems(player);
         player.setFlying(false);
         player.setAllowFlight(false);
+        clearPurgeVignette(player);
         scoreboard.detach(player);
         restoreGameMode(player);
         plugin.getSessionManager().clear(uuid);
@@ -227,6 +231,8 @@ public class DisasterManager implements MiniGame {
                 p.setGameMode(GameMode.SURVIVAL);
                 p.setHealth(maxHealth(p));
                 p.setFoodLevel(20);
+                p.removePotionEffect(PotionEffectType.SATURATION);
+                p.getInventory().addItem(new ItemStack(Material.COOKED_BEEF, 64));
                 p.setAllowFlight(true);
                 p.setFlying(false);
                 if (dashEnabled) {
@@ -342,6 +348,7 @@ public class DisasterManager implements MiniGame {
         clearAnvils();
         clearZombies();
         stopAcidWeather();
+        clearPurgeVignetteAll();
         phase = Phase.INTERMISSION;
         secondsLeft = Math.max(1, plugin.getConfig().getInt("disaster.intermission-seconds", 5));
         broadcastTitle("§a§lACCALMIE", "§7La prochaine vague sera pire...");
@@ -825,6 +832,14 @@ public class DisasterManager implements MiniGame {
     }
 
     private void purgeTick() {
+        if (tickCounter % 20 == 0) {
+            for (UUID uuid : activePlayers) {
+                Player p = plugin.getServer().getPlayer(uuid);
+                if (p != null) {
+                    applyPurgeVignette(p);
+                }
+            }
+        }
         if (tickCounter % 100 != 0) return;
         for (UUID uuid : activePlayers) {
             Player p = plugin.getServer().getPlayer(uuid);
@@ -836,6 +851,34 @@ public class DisasterManager implements MiniGame {
 
     public boolean isPurgeActive() {
         return running && phase == Phase.DISASTER && activeDisasters.contains("purge");
+    }
+
+    private void applyPurgeVignette(Player p) {
+        if (purgeBorder == null) {
+            purgeBorder = plugin.getServer().createWorldBorder();
+            purgeBorder.setCenter(0, 0);
+            purgeBorder.setSize(100_000);
+            purgeBorder.setWarningDistance(100_000);
+        }
+        if (p.getWorldBorder() != purgeBorder) {
+            p.setWorldBorder(purgeBorder);
+        }
+    }
+
+    private void clearPurgeVignette(Player p) {
+        if (p.getWorldBorder() != null) {
+            p.setWorldBorder(null);
+        }
+    }
+
+    private void clearPurgeVignetteAll() {
+        for (UUID uuid : allInvolved()) {
+            Player p = plugin.getServer().getPlayer(uuid);
+            if (p != null) {
+                clearPurgeVignette(p);
+            }
+        }
+        purgeBorder = null;
     }
 
     private void zombieTick() {
@@ -1122,6 +1165,7 @@ public class DisasterManager implements MiniGame {
             p.setHealth(maxHealth(p));
             p.setFlying(false);
             p.setAllowFlight(false);
+            clearPurgeVignette(p);
             sendToSpectator(p);
             sendTitle(p, "§c§lÉLIMINÉ", "§7Direction la zone des spectateurs");
         }
@@ -1203,6 +1247,7 @@ public class DisasterManager implements MiniGame {
         clearAnvils();
         clearZombies();
         stopAcidWeather();
+        clearPurgeVignetteAll();
 
         Zone arena = plugin.getZoneManager().getZone(ID, "arena");
         World world = arena == null ? null : plugin.getServer().getWorld(arena.getWorld());

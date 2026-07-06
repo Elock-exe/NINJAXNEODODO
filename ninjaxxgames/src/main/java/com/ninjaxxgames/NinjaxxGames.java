@@ -84,7 +84,11 @@ public final class NinjaxxGames extends JavaPlugin {
         backgroundMusicManager.start();
 
         getServer().getScheduler().runTaskTimer(this, () -> {
+            var disaster = eventManager.get(DisasterManager.ID);
             for (var player : getServer().getOnlinePlayers()) {
+                if (disaster instanceof DisasterManager dm && dm.isActive(player.getUniqueId())) {
+                    continue;
+                }
                 player.addPotionEffect(new PotionEffect(
                         PotionEffectType.SATURATION, 400, 0, false, false, false));
             }
