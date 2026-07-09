@@ -1,0 +1,18 @@
+name: MultiGame
+version: 1.0.0
+main: com.multigame.MultiGame
+api-version: '1.21'
+author: CACA
+description: CACA
+softdepend: [PlaceholderAPI, NoteBlockAPI]
+commands:
+  multigame:
+    description: Commande principale du plugin MultiGame
+    usage: /multigame <sous-commande>
+    permission: multigame.admin
+    permission-message: "§cTu n'as pas la permission d'utiliser cette commande."
+
+permissions:
+  multigame.admin:
+    description: Permet d'administrer le plugin MultiGame
+    default: op

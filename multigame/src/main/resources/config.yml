@@ -1,0 +1,186 @@
+server-state: OFF
+
+protect-zone-blocks: true
+disable-mob-spawning: true
+
+hub:
+  world: null
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  yaw: 0.0
+  pitch: 0.0
+
+lift-cooldown-seconds: 3
+
+lifts: {}
+
+zones: {}
+
+squidgame:
+  round-duration-seconds: 120
+  # Feux plus faciles : rouge plus court, vert plus long, gros avertissement avant le rouge.
+  red-light-min-seconds: 2
+  red-light-max-seconds: 4
+  green-light-min-seconds: 6
+  green-light-max-seconds: 10
+  red-light-warning-seconds: 2.5
+  # Délai de grâce (secondes) après le passage au ROUGE : on ne peut pas être éliminé pendant ce temps (réaction).
+  red-light-grace-seconds: 0.8
+  # Distance de mouvement tolérée pendant le ROUGE avant élimination (plus haut = plus indulgent).
+  move-threshold: 0.25
+  points:
+    participation: 10
+    win-bonus: 100
+
+crowngame:
+  round-duration-seconds: 180
+  crown-ratio: 0.5
+  # Événements de chaos aléatoires (basse gravité, rapidité, super saut, rafale de vent)
+  events-enabled: true
+  event-interval-seconds: 25
+  event-duration-seconds: 8
+  points:
+    participation: 10
+    win-bonus: 100
+
+hotpotato:
+  players-per-potato: 8
+  min-timer-seconds: 15
+  max-timer-seconds: 40
+  # Dernières secondes où un compte à rebours "ding-dong" se joue au porteur de la patate
+  warning-seconds: 10
+  # Coup = effet "wind burst" (envoi en l'air), sans dégâts
+  windburst-strength: 0.9
+  windburst-lift: 0.55
+  points:
+    participation: 10
+    win-bonus: 100
+
+prophunt:
+  seekers-per-player: 10
+  hide-duration-seconds: 45
+  seek-duration-seconds: 180
+  hider-sound-interval-seconds: 20
+  # Nombre de coups d'épée nécessaires pour démasquer un caché
+  hider-hits: 3
+  points:
+    participation: 10
+    win-bonus: 100
+    # Points gagnés par seconde de survie, + bonus si survie jusqu'au bout
+    per-second: 2
+    survivor-bonus: 25
+
+disaster:
+  round-duration-seconds: 45
+  intermission-seconds: 5
+  # Empêche les joueurs de se taper entre eux (coups + projectiles) pendant la partie
+  prevent-pvp: true
+  # Empêche les joueurs de casser des blocks pendant la partie
+  prevent-block-break: true
+  # Multiplicateur de régénération de vie pendant le Disaster (0 = aucune régen, 1 = normale)
+  health-regen-multiplier: 0.2
+  regen-after-game: true
+  max-regen-blocks: 2000000
+  # Régénération progressive : nombre de blocs restaurés par tick (plus bas = plus lent, moins de lag)
+  regen-blocks-per-tick: 20000
+
+  # L'ordre des catastrophes est mélangé aléatoirement à chaque partie (false = ordre de la liste)
+  random-order: true
+  rounds:
+    - meteor
+    - tornado
+    - lightning
+    - acidrain
+    - anvilrain
+    - zombies
+    # purge : le PvP (normalement coupé) est activé pendant cette vague
+    - purge
+  dash:
+    enabled: true
+    strength: 1.4
+    up: 0.35
+    cooldown-seconds: 6
+  meteor:
+    interval-ticks: 8
+    count-per-wave: 4
+    power: 4.0
+    fuse-ticks: 100
+    spawn-height: 22.0
+    set-fire: true
+    # Multiplicateur des dégâts d'explosion sur les joueurs (1.0 = normal, plus bas = font moins mal)
+    damage-multiplier: 0.35
+    # Dégâts MAX qu'une seule météorite peut infliger (6.0 = 3 cœurs). Empêche le one-shot. 0 = pas de plafond.
+    max-damage: 6.0
+  tornado:
+    radius: 7.0
+    pull-strength: 0.6
+    lift-strength: 0.55
+    damage-per-second: 2.0
+    move-speed: 0.35
+    # Nombre max de tornades simultanées (elles apparaissent avec la montée d'intensité, en fin de partie)
+    max-count: 4
+  lightning:
+    interval-ticks: 30
+    strikes-per-wave: 2
+    target-players: false
+  acidrain:
+    # Dégâts infligés aux joueurs exposés au ciel (s'abriter sous un toit protège)
+    damage-amount: 1.0
+    # Intervalle entre deux dégâts, en secondes (1 dégât toutes les 2 secondes par défaut)
+    damage-interval-seconds: 2.0
+    # Dissolution lente des blocs exposés : toutes les X ticks, quelques blocs fondent
+    dissolve-interval-ticks: 30
+    dissolve-per-cycle: 2
+  anvilrain:
+    # Même fonctionnement que les météorites : spawn au-dessus de l'arène, impact détecté au sol
+    interval-ticks: 10
+    count-per-wave: 6
+    # Dégâts par bloc de chute (une enclume qui tombe de haut fait très mal)
+    damage-per-block: 4.0
+    max-damage: 20
+    spawn-height: 22.0
+    # Vitesse de chute initiale (même valeur que les météorites TNT)
+    fall-speed: 1.6
+    # Rayon de blocs cassés à l'impact (0 = aucun dégât aux constructions)
+    break-radius: 1
+  zombies:
+    spawn-interval-ticks: 30
+    per-spawn: 4
+    max-alive: 18
+  # Ravitaillements : objets spéciaux qui apparaissent aléatoirement dans l'arène
+  # (seau d'eau à usage unique, potion de soin, bloc de slime, steak — tiré au hasard)
+  supply:
+    enabled: true
+    interval-seconds: 5
+    max-on-ground: 12
+    # Nombre d'items déposés à chaque cycle
+    per-cycle: 3
+    # Force du saut quand on marche sur un bloc de slime posé (jump pad)
+    slime-jump-strength: 1.1
+  points:
+    participation: 10
+    win-bonus: 100
+
+# Interlude PvP entre deux events (/multigame interlude) : épée en bois pour tous,
+# points par kill ajoutés au leaderboard à la fin, aucun jeu ne peut être lancé pendant.
+interlude:
+  duration-seconds: 120
+  points-per-kill: 30
+  # Brouillard : limite la vision des joueurs à ~5 blocks (combat rapproché)
+  fog-effect: true
+
+# Musique de fond custom via NoteBlockAPI (chansons Note Block Studio .nbs).
+# Nécessite le plugin NoteBlockAPI installé sur le serveur.
+# Dépose tes fichiers .nbs dans : plugins/MultiGame/songs/
+# "file" = nom du fichier .nbs, "volume" = 0 à 100. Laisser "file" vide pour couper un contexte.
+music:
+  enabled: true
+  hub:
+    file: "hub.nbs"
+    volume: 50
+  game:
+    file: "game.nbs"
+    volume: 50
+
+scores: {}
