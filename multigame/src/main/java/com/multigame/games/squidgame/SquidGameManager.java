@@ -376,7 +376,16 @@ public class SquidGameManager implements MiniGame {
         resetState();
     }
 
+    private void checkAllCleared() {
+        if (phase == SquidGamePhase.FINISHED) return;
+        if (activePlayers.isEmpty()) {
+            broadcast("§6[Squid Game] §fPlus personne en course — fin de la partie !");
+            endGame();
+        }
+    }
+
     private void endGame() {
+        if (phase == SquidGamePhase.FINISHED) return;
         phase = SquidGamePhase.FINISHED;
         cancelTasks();
         broadcast("§6[Squid Game] §fLe temps est écoulé ! Calcul du classement...");
@@ -503,8 +512,13 @@ public class SquidGameManager implements MiniGame {
             double graceSeconds = plugin.getConfig().getDouble("squidgame.red-light-grace-seconds", 0.8);
             boolean inGrace = System.currentTimeMillis() - redLightStartMs < (long) (graceSeconds * 1000);
 
+            if (inGrace) {
+                lastLocations.put(uuid, to.clone());
+                return;
+            }
+
             Location last = lastLocations.get(uuid);
-            if (!inGrace && last != null && last.getWorld() != null && to.getWorld() != null
+            if (last != null && last.getWorld() != null && to.getWorld() != null
                     && last.getWorld().equals(to.getWorld())) {
                 double threshold = plugin.getConfig().getDouble("squidgame.move-threshold", 0.25);
                 double dx = last.getX() - to.getX();
@@ -512,9 +526,9 @@ public class SquidGameManager implements MiniGame {
                 double distSq = dx * dx + dz * dz;
                 if (distSq > threshold * threshold) {
                     eliminatePlayer(player, "§c[Squid Game] §fÉliminé : mouvement pendant le ROUGE !");
-                    return;
                 }
             }
+            return;
         }
 
         lastLocations.put(uuid, to.clone());
@@ -530,6 +544,7 @@ public class SquidGameManager implements MiniGame {
                 + " §f! Attends la fin de la partie.");
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
         updateScoreboard();
+        checkAllCleared();
     }
 
     private void eliminatePlayer(Player player, String reason) {
@@ -545,6 +560,7 @@ public class SquidGameManager implements MiniGame {
         if (eliminatedZone != null) {
             teleportToZoneCenter(player, eliminatedZone);
         }
+        checkAllCleared();
     }
 
     private Location getPlayerLoc(UUID uuid) {
